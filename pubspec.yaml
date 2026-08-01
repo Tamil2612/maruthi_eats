@@ -1,0 +1,36 @@
+name: maruthi_eats
+description: Maruthi Eats - Customer ordering app
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.9
+
+  # Firebase
+  firebase_core: ^4.12.1
+  cloud_firestore: ^6.7.1
+  firebase_auth: ^6.5.6
+
+  # State management
+  provider: ^6.1.5+1
+
+  # UI
+  google_fonts: ^8.2.1
+  intl: ^0.20.3
+  flutter_screenutil: ^5.9.3
+  google_maps_flutter: ^2.18.0
+  geolocator: ^14.0.3
+  geocoding: ^5.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true

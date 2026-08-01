@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "119948554671",
+    "project_id": "maruthi-eats",
+    "storage_bucket": "maruthi-eats.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:119948554671:android:df08f278e1dc83d5b23f5a",
+        "android_client_info": {
+          "package_name": "com.example.maruthi_eats"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAlnBDuqrG9DiwdarS2H2iZXhr2IzAq1bM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
