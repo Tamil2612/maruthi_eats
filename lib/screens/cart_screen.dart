@@ -48,12 +48,12 @@ class CartScreen extends StatelessWidget {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(item.menuItem.name,
-                                        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15.sp)),
+                                        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp)),
                                     2.verticalSpace,
                                     Text('₹${item.menuItem.price.toStringAsFixed(0)}',
                                         style: TextStyle(
                                             color: AppColors.textDark.withValues(alpha: 0.5),
-                                            fontSize: 13.sp)),
+                                            fontSize: 12.sp)),
                                   ],
                                 ),
                               ),
@@ -86,7 +86,7 @@ class CartScreen extends StatelessWidget {
                               16.horizontalSpace,
                               Text(
                                 '₹${item.total.toStringAsFixed(0)}',
-                                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15.sp),
+                                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp),
                               ),
                             ],
                           ),
@@ -114,7 +114,7 @@ class _CartSummary extends StatelessWidget {
         color: AppColors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(32.r)),
         boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 20.r, offset: Offset(0, -10.h)),
+          BoxShadow(color: AppColors.black.withValues(alpha: 0.08), blurRadius: 20.r, offset: Offset(0, -10.h)),
         ],
       ),
       child: SafeArea(
@@ -125,9 +125,9 @@ class _CartSummary extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Total Bill', style: TextStyle(fontSize: 14.sp, color: AppColors.textDark.withValues(alpha: 0.5))),
+                Text('Total Bill', style: TextStyle(fontSize: 13.sp, color: AppColors.textDark.withValues(alpha: 0.5))),
                 Text('₹${cart.subtotal.toStringAsFixed(0)}',
-                    style: TextStyle(fontSize: 20.sp, fontWeight: FontWeight.w800, color: AppColors.maroon)),
+                    style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w800, color: AppColors.maroon)),
               ],
             ),
             20.verticalSpace,
@@ -144,7 +144,7 @@ class _CartSummary extends StatelessWidget {
                   foregroundColor: AppColors.gold,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
                 ),
-                child: Text('Proceed to Checkout', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700)),
+                child: Text('Proceed to Checkout', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700)),
               ),
             ),
           ],

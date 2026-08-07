@@ -124,12 +124,16 @@ class AuthService {
     required String fullAddress,
     required double latitude,
     required double longitude,
+    required String recipientName,
+    required String recipientPhone,
   }) async {
     final data = {
       'label': label,
       'full_address': fullAddress,
       'latitude': latitude,
       'longitude': longitude,
+      'recipient_name': recipientName,
+      'recipient_phone': recipientPhone,
     };
 
     if (addressId == null) {

@@ -25,7 +25,7 @@ class _OtpScreenState extends State<OtpScreen> {
       backgroundColor: AppColors.cream,
       appBar: AppBar(
         title: const Text('Verification'),
-        backgroundColor: Colors.transparent,
+        backgroundColor: AppColors.white.withValues(alpha: 0.0),
         foregroundColor: AppColors.maroon,
         elevation: 0,
       ),

@@ -43,7 +43,7 @@ class MenuItemCard extends StatelessWidget {
                         Expanded(
                           child: Text(
                             item.name,
-                            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16.sp),
+                            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -51,14 +51,30 @@ class MenuItemCard extends StatelessWidget {
                       ],
                     ),
                     6.verticalSpace,
-                    Text(
-                      '₹${item.price.toStringAsFixed(0)}',
-                      style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.maroon, fontSize: 16.sp),
+                    Row(
+                      children: [
+                        Text(
+                          '₹${item.effectivePrice.toStringAsFixed(0)}',
+                          style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.maroon, fontSize: 14.sp),
+                        ),
+                        if (item.hasDiscount) ...[
+                          8.horizontalSpace,
+                          Text(
+                            '₹${item.price.toStringAsFixed(0)}',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w400,
+                              color: AppColors.textDark.withValues(alpha: 0.4),
+                              fontSize: 12.sp,
+                              decoration: TextDecoration.lineThrough,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     6.verticalSpace,
                     Text(
                       item.description,
-                      style: TextStyle(color: AppColors.textDark.withValues(alpha: 0.5), fontSize: 12.sp, height: 1.4.h),
+                      style: TextStyle(color: AppColors.textDark.withValues(alpha: 0.5), fontSize: 11.sp, height: 1.4.h),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -100,7 +116,7 @@ class MenuItemCard extends StatelessWidget {
                                     padding: EdgeInsets.zero,
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
                                   ),
-                                  child: Text('ADD', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp)),
+                                  child: Text('ADD', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.sp)),
                                 ),
                               )
                             : _QuantityStepper(item: item, qty: qty))
@@ -111,7 +127,7 @@ class MenuItemCard extends StatelessWidget {
                               borderRadius: BorderRadius.circular(8.r),
                               border: Border.all(color: Colors.grey.shade300),
                             ),
-                            child: Text('SOLD OUT', style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w800, color: Colors.grey)),
+                            child: Text('SOLD OUT', style: TextStyle(fontSize: 9.sp, fontWeight: FontWeight.w800, color: Colors.grey)),
                           ),
                   ),
                 ],

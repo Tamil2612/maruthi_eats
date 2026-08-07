@@ -5,7 +5,7 @@ import '../theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'auth/phone_login_screen.dart';
 import 'auth/profile_setup_screen.dart';
-import 'home_screen.dart';
+import 'main_navigation_screen.dart';
 
 /// Root router: shows login if signed out, profile setup if signed in but
 /// registration isn't complete yet, otherwise the home/menu screen.
@@ -49,7 +49,7 @@ class AuthGate extends StatelessWidget {
                         8.verticalSpace,
                         Text(profileSnapshot.error.toString(),
                             textAlign: TextAlign.center,
-                            style: const TextStyle(color: Colors.grey)),
+                            style: TextStyle(color: AppColors.textDark.withValues(alpha: 0.5))),
                         24.verticalSpace,
                         ElevatedButton(
                           onPressed: () => authService.signOut(),
@@ -70,7 +70,7 @@ class AuthGate extends StatelessWidget {
             }
 
             if (profileSnapshot.data == true) {
-              return const HomeScreen();
+              return const MainNavigationScreen();
             }
             return ProfileSetupScreen(phoneNumber: user.phoneNumber ?? '');
           },

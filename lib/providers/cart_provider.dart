@@ -15,11 +15,21 @@ class CartProvider extends ChangeNotifier {
 
   void addItem(MenuItem menuItem) {
     if (_items.containsKey(menuItem.id)) {
+      // Update with the latest menu item data to ensure correct price/discount
+      _items[menuItem.id]!.menuItem = menuItem;
       _items[menuItem.id]!.quantity++;
     } else {
       _items[menuItem.id] = CartItem(menuItem: menuItem);
     }
     notifyListeners();
+  }
+
+  /// Syncs existing cart item data with fresh data from Firestore
+  void syncMenuItem(MenuItem freshItem) {
+    if (_items.containsKey(freshItem.id)) {
+      _items[freshItem.id]!.menuItem = freshItem;
+      notifyListeners();
+    }
   }
 
   void removeOne(String menuItemId) {

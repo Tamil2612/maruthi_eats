@@ -7,6 +7,8 @@ class MenuItem {
   final String imageUrl;
   final bool isVeg;
   final bool available;
+  final double discountPrice;
+  final bool hasDiscount;
 
   MenuItem({
     required this.id,
@@ -17,7 +19,11 @@ class MenuItem {
     required this.imageUrl,
     required this.isVeg,
     this.available = true,
+    this.discountPrice = 0,
+    this.hasDiscount = false,
   });
+
+  double get effectivePrice => hasDiscount ? discountPrice : price;
 
   factory MenuItem.fromFirestore(String id, Map<String, dynamic> data) {
     return MenuItem(
@@ -29,6 +35,8 @@ class MenuItem {
       imageUrl: data['image_url'] ?? '',
       isVeg: data['is_veg'] ?? true,
       available: data['available'] ?? true,
+      discountPrice: (data['discount_price'] ?? 0).toDouble(),
+      hasDiscount: data['has_discount'] ?? false,
     );
   }
 
@@ -41,6 +49,8 @@ class MenuItem {
       'image_url': imageUrl,
       'is_veg': isVeg,
       'available': available,
+      'discount_price': discountPrice,
+      'has_discount': hasDiscount,
     };
   }
 }

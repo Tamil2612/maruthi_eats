@@ -4,6 +4,37 @@ import 'package:flutter/widgets.dart';
 
 class Assets {
   Assets._();
+
+  static const $AssetsBannersGen banners = $AssetsBannersGen();
+  static const $AssetsGifsGen gifs = $AssetsGifsGen();
+  static const $AssetsIconsGen icons = $AssetsIconsGen();
+}
+
+class $AssetsGifsGen {
+  const $AssetsGifsGen();
+
+  final AssetGenImage fryingPan =
+      const AssetGenImage('assets/gifs/frying-pan.gif');
+  final AssetGenImage outForDelivery =
+      const AssetGenImage('assets/gifs/out_for_delivery.gif');
+  final AssetGenImage waiting = const AssetGenImage('assets/gifs/waiting.gif');
+}
+
+class $AssetsBannersGen {
+  const $AssetsBannersGen();
+
+  final AssetGenImage bannerOne =
+      const AssetGenImage('assets/banners/banner_one.png');
+  final AssetGenImage bannerThree =
+      const AssetGenImage('assets/banners/banner_three.png');
+  final AssetGenImage bannerTwo =
+      const AssetGenImage('assets/banners/banner_two.png');
+}
+
+class $AssetsIconsGen {
+  const $AssetsIconsGen();
+
+  final AssetGenImage cart = const AssetGenImage('assets/icons/cart.png');
 }
 
 class AssetGenImage {

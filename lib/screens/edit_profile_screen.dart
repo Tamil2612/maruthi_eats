@@ -107,7 +107,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               style: TextStyle(color: AppColors.textDark.withValues(alpha: 0.5)),
               decoration: const InputDecoration(
                 prefixIcon: Icon(Icons.phone_android_outlined),
-                fillColor: Colors.black12,
+                fillColor: AppColors.cream,
               ),
             ),
             24.verticalSpace,

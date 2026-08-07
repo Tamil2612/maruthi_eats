@@ -59,20 +59,20 @@ class OrderStatusStepper extends StatelessWidget {
                     width: 32.w,
                     height: 32.h,
                     decoration: BoxDecoration(
-                      color: isDone ? AppColors.maroon : Colors.grey.shade200,
+                      color: isDone ? AppColors.maroon : AppColors.grey.withValues(alpha: 0.1),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
                       _icons[i],
                       size: 16.r,
-                      color: isDone ? AppColors.gold : Colors.grey,
+                      color: isDone ? AppColors.gold : AppColors.grey,
                     ),
                   ),
                   if (!isLast)
                     Expanded(
                       child: Container(
                         width: 2.w,
-                        color: isDone ? AppColors.maroon : Colors.grey.shade200,
+                        color: isDone ? AppColors.maroon : AppColors.grey.withValues(alpha: 0.1),
                       ),
                     ),
                 ],
@@ -84,7 +84,7 @@ class OrderStatusStepper extends StatelessWidget {
                   orderStatusLabel(_steps[i]),
                   style: TextStyle(
                     fontWeight: isDone ? FontWeight.w600 : FontWeight.w400,
-                    color: isDone ? AppColors.textDark : Colors.grey,
+                    color: isDone ? AppColors.textDark : AppColors.grey,
                     fontSize: 14.sp,
                   ),
                 ),

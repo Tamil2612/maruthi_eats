@@ -4,7 +4,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import '../providers/cart_provider.dart';
 import 'package:flutter/material.dart';
+import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
+import '../models/address_model.dart';
+import 'saved_addresses_screen.dart';
 import 'order_tracking_screen.dart';
 
 enum PaymentChoice { upi, cod }
@@ -17,7 +20,8 @@ class CheckoutScreen extends StatefulWidget {
 }
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
-  final _addressController = TextEditingController();
+  final _authService = AuthService();
+  AddressModel? _selectedAddress;
   PaymentChoice _payment = PaymentChoice.upi;
   bool _placing = false;
 
@@ -32,17 +36,105 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Delivery Address', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16.sp)),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Delivery Address', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14.sp)),
+                TextButton(
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const SavedAddressesScreen()),
+                  ),
+                  child: Text(_selectedAddress == null ? 'Add Address' : 'Change',
+                      style: TextStyle(color: AppColors.maroon, fontWeight: FontWeight.bold, fontSize: 13.sp)),
+                ),
+              ],
+            ),
             8.verticalSpace,
-            TextField(
-              controller: _addressController,
-              maxLines: 3,
-              decoration: const InputDecoration(
-                hintText: 'House/flat no, street, area, landmark...',
-              ),
+            StreamBuilder<List<AddressModel>>(
+              stream: _authService.watchAddresses(_authService.currentUser!.uid),
+              builder: (context, snapshot) {
+                final addresses = snapshot.data ?? [];
+                
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator(color: AppColors.maroon));
+                }
+
+                if (addresses.isEmpty) {
+                  return InkWell(
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const SavedAddressesScreen()),
+                    ),
+                    child: Container(
+                      padding: EdgeInsets.all(16.r),
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: AppColors.error.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(12.r),
+                        border: Border.all(color: AppColors.error.withValues(alpha: 0.2)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.location_off_outlined, color: AppColors.error),
+                          12.horizontalSpace,
+                          const Text('No address saved. Tap to add one.', style: TextStyle(color: AppColors.error)),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+
+                // If nothing selected yet, pick the first one
+                if (_selectedAddress == null && addresses.isNotEmpty) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    setState(() => _selectedAddress = addresses.first);
+                  });
+                } else if (_selectedAddress != null) {
+                  // Ensure current selection still exists in the latest list
+                  final exists = addresses.any((a) => a.id == _selectedAddress!.id);
+                  if (!exists) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      setState(() => _selectedAddress = addresses.first);
+                    });
+                  } else {
+                    // Update selection with latest data (in case label changed)
+                    final updated = addresses.firstWhere((a) => a.id == _selectedAddress!.id);
+                    if (updated.fullAddress != _selectedAddress!.fullAddress || updated.label != _selectedAddress!.label) {
+                       WidgetsBinding.instance.addPostFrameCallback((_) {
+                        setState(() => _selectedAddress = updated);
+                      });
+                    }
+                  }
+                }
+
+                return Card(
+                  margin: EdgeInsets.zero,
+                  child: Padding(
+                    padding: EdgeInsets.all(16.r),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.location_on_outlined, color: AppColors.maroon),
+                        16.horizontalSpace,
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(_selectedAddress?.label ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
+                              4.verticalSpace,
+                              Text(_selectedAddress?.fullAddress ?? '', 
+                                  style: TextStyle(fontSize: 13.sp, color: AppColors.textDark.withValues(alpha: 0.6))),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
             ),
             24.verticalSpace,
-            Text('Payment Method', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16.sp)),
+            Text('Payment Method', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14.sp)),
             8.verticalSpace,
             _PaymentOption(
               title: 'Pay via UPI',
@@ -70,7 +162,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           color: AppColors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(32.r)),
           boxShadow: [
-            BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 20.r, offset: Offset(0, -10.h)),
+            BoxShadow(color: AppColors.black.withValues(alpha: 0.08), blurRadius: 20.r, offset: Offset(0, -10.h)),
           ],
         ),
         child: SafeArea(
@@ -81,9 +173,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Total Payable', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w500)),
+                  Text('Total Payable', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500)),
                   Text('₹${cart.subtotal.toStringAsFixed(0)}',
-                      style: TextStyle(fontSize: 20.sp, fontWeight: FontWeight.w800, color: AppColors.maroon)),
+                      style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w800, color: AppColors.maroon)),
                 ],
               ),
               20.verticalSpace,
@@ -112,9 +204,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Future<void> _placeOrder(BuildContext context, CartProvider cart) async {
-    if (_addressController.text.trim().isEmpty) {
+    if (_selectedAddress == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a delivery address')),
+        const SnackBar(content: Text('Please select a delivery address')),
       );
       return;
     }
@@ -124,10 +216,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     try {
       final userId = FirebaseAuth.instance.currentUser?.uid ?? 'guest';
 
-      // NOTE: In production, order creation + UPI payment initiation should go
-      // through the backend (see backend-requirements.md) so stock and price
-      // validation happen server-side. This writes directly to Firestore for now
-      // as a starting point — swap this for an API call once the backend is ready.
       final orderRef = await FirebaseFirestore.instance.collection('orders').add({
         'customer_id': userId,
         'items': cart.items.values.map((c) => c.toOrderMap()).toList(),
@@ -135,7 +223,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         'payment_mode': _payment == PaymentChoice.upi ? 'upi' : 'cod',
         'payment_status': _payment == PaymentChoice.upi ? 'pending' : 'cod_pending',
         'order_status': 'placed',
-        'delivery_address': _addressController.text.trim(),
+        'delivery_address': _selectedAddress!.fullAddress,
+        'address_label': _selectedAddress!.label,
+        'latitude': _selectedAddress!.latitude,
+        'longitude': _selectedAddress!.longitude,
         'created_at': FieldValue.serverTimestamp(),
       });
 
@@ -186,7 +277,7 @@ class _PaymentOption extends StatelessWidget {
           color: selected ? AppColors.maroon.withValues(alpha: 0.06) : AppColors.white,
           borderRadius: BorderRadius.circular(12.r),
           border: Border.all(
-            color: selected ? AppColors.maroon : Colors.grey.shade300,
+            color: selected ? AppColors.maroon : AppColors.grey.withValues(alpha: 0.3),
             width: selected ? 1.5.w : 1.w,
           ),
         ),
@@ -206,7 +297,7 @@ class _PaymentOption extends StatelessWidget {
             ),
             Icon(
               selected ? Icons.radio_button_checked : Icons.radio_button_off,
-              color: selected ? AppColors.maroon : Colors.grey,
+              color: selected ? AppColors.maroon : AppColors.grey,
               size: 20.r,
             ),
           ],

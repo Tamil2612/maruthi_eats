@@ -25,6 +25,27 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
       body: StreamBuilder<List<AddressModel>>(
         stream: _authService.watchAddresses(user.uid),
         builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return Center(
+              child: Padding(
+                padding: EdgeInsets.all(24.r),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.error_outline, size: 48.r, color: AppColors.error),
+                    16.verticalSpace,
+                    Text('Permission Denied',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18.sp, color: AppColors.error)),
+                    8.verticalSpace,
+                    Text('Please update your Firestore rules in the Firebase Console.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: AppColors.textDark.withValues(alpha: 0.6))),
+                  ],
+                ),
+              ),
+            );
+          }
+
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator(color: AppColors.maroon));
           }
@@ -45,31 +66,131 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
           }
 
           return ListView.builder(
-            padding: EdgeInsets.all(16.r),
+            padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 100.h),
             itemCount: addresses.length,
             itemBuilder: (context, i) {
               final addr = addresses[i];
-              return Card(
-                child: ListTile(
-                  leading: Icon(Icons.location_on_outlined, color: AppColors.maroon, size: 24.r),
-                  title: Text(addr.label, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.sp)),
-                  subtitle: Text(addr.fullAddress, style: TextStyle(fontSize: 13.sp, color: AppColors.textDark.withValues(alpha: 0.6))),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: Icon(Icons.edit_outlined, size: 20.r, color: Colors.blue),
-                        onPressed: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => AddEditAddressScreen(address: addr)),
-                        ),
+              return Container(
+                margin: EdgeInsets.only(bottom: 16.h),
+                decoration: BoxDecoration(
+                  color: AppColors.white,
+                  borderRadius: BorderRadius.circular(20.r),
+                  border: Border.all(color: AppColors.maroon.withValues(alpha: 0.08)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.black.withValues(alpha: 0.04),
+                      blurRadius: 10.r,
+                      offset: Offset(0, 4.h),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: EdgeInsets.all(16.r),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Category Icon with soft background
+                          Container(
+                            padding: EdgeInsets.all(12.r),
+                            decoration: BoxDecoration(
+                              color: AppColors.maroon.withValues(alpha: 0.06),
+                              borderRadius: BorderRadius.circular(14.r),
+                            ),
+                            child: Icon(
+                              addr.label.toLowerCase() == 'home'
+                                  ? Icons.home_rounded
+                                  : addr.label.toLowerCase() == 'work'
+                                      ? Icons.business_rounded
+                                      : Icons.place_rounded,
+                              size: 26.r,
+                              color: AppColors.maroon,
+                            ),
+                          ),
+                          16.horizontalSpace,
+                          // Address Details
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  addr.label.toUpperCase(),
+                                  style: TextStyle(
+                                    color: AppColors.maroon,
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 11.sp,
+                                    letterSpacing: 1.w,
+                                  ),
+                                ),
+                                6.verticalSpace,
+                                Text(
+                                  addr.fullAddress,
+                                  style: TextStyle(
+                                    fontSize: 12.sp,
+                                    color: AppColors.textDark.withValues(alpha: 0.7),
+                                    height: 1.5,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                8.verticalSpace,
+                                Row(
+                                  children: [
+                                    Icon(Icons.person_outline, size: 13.r, color: AppColors.textDark.withValues(alpha: 0.5)),
+                                    4.horizontalSpace,
+                                    Text(
+                                      addr.recipientName,
+                                      style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w600, color: AppColors.textDark.withValues(alpha: 0.6)),
+                                    ),
+                                    12.horizontalSpace,
+                                    Icon(Icons.phone_outlined, size: 13.r, color: AppColors.textDark.withValues(alpha: 0.5)),
+                                    4.horizontalSpace,
+                                    Text(
+                                      addr.recipientPhone,
+                                      style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w600, color: AppColors.textDark.withValues(alpha: 0.6)),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                      IconButton(
-                        icon: Icon(Icons.delete_outline, size: 20.r, color: AppColors.error),
-                        onPressed: () => _confirmDelete(addr),
+                    ),
+                    const Divider(height: 1),
+                    // Action Buttons Row
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 4.h),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton.icon(
+                            onPressed: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => AddEditAddressScreen(address: addr)),
+                            ),
+                            icon: Icon(Icons.edit_outlined, size: 18.r),
+                            label: const Text('EDIT'),
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppColors.maroon,
+                              textStyle: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          16.horizontalSpace,
+                          TextButton.icon(
+                            onPressed: () => _confirmDelete(addr),
+                            icon: Icon(Icons.delete_outline, size: 18.r),
+                            label: const Text('DELETE'),
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppColors.error,
+                              textStyle: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               );
             },

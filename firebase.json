@@ -1,1 +1,39 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"maruthi-eats","appId":"1:119948554671:android:df08f278e1dc83d5b23f5a","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"maruthi-eats","configurations":{"android":"1:119948554671:android:df08f278e1dc83d5b23f5a","ios":"1:119948554671:ios:4021022676f5077cb23f5a","macos":"1:119948554671:ios:4021022676f5077cb23f5a","web":"1:119948554671:web:fc13c7a8836ab824b23f5a","windows":"1:119948554671:web:c8a050aa0f5148d5b23f5a"}}}}}}
+{
+  "hosting": {
+    "public": "build/web",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "maruthi-eats",
+          "appId": "1:119948554671:android:df08f278e1dc83d5b23f5a",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "maruthi-eats",
+          "configurations": {
+            "android": "1:119948554671:android:df08f278e1dc83d5b23f5a",
+            "ios": "1:119948554671:ios:4021022676f5077cb23f5a",
+            "macos": "1:119948554671:ios:4021022676f5077cb23f5a",
+            "web": "1:119948554671:web:fc13c7a8836ab824b23f5a",
+            "windows": "1:119948554671:web:c8a050aa0f5148d5b23f5a"
+          }
+        }
+      }
+    }
+  }
+}
