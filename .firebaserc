@@ -1,5 +1,14 @@
 {
   "projects": {
     "default": "maruthi-eats"
+  },
+  "targets": {
+    "maruthi-eats": {
+      "hosting": {
+        "customer": [
+          "maruthi-eats"
+        ]
+      }
+    }
   }
 }
