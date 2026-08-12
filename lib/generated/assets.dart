@@ -8,6 +8,7 @@ class Assets {
   static const $AssetsBannersGen banners = $AssetsBannersGen();
   static const $AssetsGifsGen gifs = $AssetsGifsGen();
   static const $AssetsIconsGen icons = $AssetsIconsGen();
+  static const $AssetsLogoGen logo = $AssetsLogoGen();
 }
 
 class $AssetsGifsGen {
@@ -34,7 +35,18 @@ class $AssetsBannersGen {
 class $AssetsIconsGen {
   const $AssetsIconsGen();
 
+  final AssetGenImage animationPng512 =
+      const AssetGenImage('assets/icons/animation-png_512.png');
   final AssetGenImage cart = const AssetGenImage('assets/icons/cart.png');
+  final AssetGenImage home = const AssetGenImage('assets/icons/home.png');
+  final AssetGenImage menu = const AssetGenImage('assets/icons/menu.png');
+  final AssetGenImage orders = const AssetGenImage('assets/icons/orders.png');
+}
+
+class $AssetsLogoGen {
+  const $AssetsLogoGen();
+
+  final AssetGenImage logo = const AssetGenImage('assets/logo/logo.png');
 }
 
 class AssetGenImage {

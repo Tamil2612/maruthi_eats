@@ -62,8 +62,15 @@ class HomeScreen extends StatelessWidget {
                         MaterialPageRoute(
                             builder: (_) => const FullMenuScreen()),
                       ),
-                      icon: const Icon(Icons.restaurant_menu),
-                      label: Text('VIEW ALL MENU', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.bold)),
+                      icon: Image.asset(
+                        "assets/icons/menu.png",
+                        width: 28.w,
+                        height: 28.h,
+                        color: AppColors.gold,
+                      ),
+                      label: Text('VIEW ALL MENU',
+                          style: TextStyle(
+                              fontSize: 14.sp, fontWeight: FontWeight.bold)),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.maroon,
                         foregroundColor: AppColors.gold,
@@ -73,7 +80,7 @@ class HomeScreen extends StatelessWidget {
                     ),
                   ),
                 ),
-                140.verticalSpace, // Extra space for floating elements
+                140.verticalSpace,
               ],
             ),
           ),

@@ -29,15 +29,20 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     final userId = FirebaseAuth.instance.currentUser?.uid;
 
     return StreamBuilder<QuerySnapshot>(
-      stream: userId == null 
-        ? null 
-        : FirebaseFirestore.instance
-            .collection('orders')
-            .where('customer_id', isEqualTo: userId)
-            .where('order_status', whereIn: ['placed', 'confirmed', 'preparing', 'out_for_delivery'])
-            .snapshots(),
+      stream: userId == null
+          ? null
+          : FirebaseFirestore.instance
+              .collection('orders')
+              .where('customer_id', isEqualTo: userId)
+              .where('order_status', whereIn: [
+              'placed',
+              'confirmed',
+              'preparing',
+              'out_for_delivery'
+            ]).snapshots(),
       builder: (context, snapshot) {
-        final hasLiveOrders = snapshot.hasData && snapshot.data!.docs.isNotEmpty;
+        final hasLiveOrders =
+            snapshot.hasData && snapshot.data!.docs.isNotEmpty;
 
         return Scaffold(
           body: Stack(
@@ -46,7 +51,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                 index: _currentIndex,
                 children: _screens,
               ),
-              
+
               // Global Cart FAB - Adjusts height if there are live orders on Home screen
               CartFab(
                 bottom: (_currentIndex == 0 && hasLiveOrders) ? 100.h : 16.h,
@@ -60,26 +65,42 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             iconSize: 20.r,
             selectedFontSize: 10.sp,
             unselectedFontSize: 10.sp,
-            items: const [
+            items: [
               BottomNavigationBarItem(
-                icon: Icon(Icons.home_outlined),
-                activeIcon: Icon(Icons.home),
+                icon: _buildIcon('assets/icons/home.png', false),
+                activeIcon: _buildIcon('assets/icons/home.png', true),
                 label: 'Home',
               ),
               BottomNavigationBarItem(
-                icon: Icon(Icons.shopping_bag_outlined),
-                activeIcon: Icon(Icons.shopping_bag),
+                icon: _buildIcon('assets/icons/orders.png', false),
+                activeIcon: _buildIcon('assets/icons/orders.png', true),
                 label: 'Orders',
               ),
               BottomNavigationBarItem(
-                icon: Icon(Icons.person_outline),
-                activeIcon: Icon(Icons.person),
+                icon: _buildIcon('assets/icons/profile.png', false),
+                activeIcon: _buildIcon('assets/icons/profile.png', true),
                 label: 'Account',
               ),
             ],
           ),
         );
       },
+    );
+  }
+
+  Widget _buildIcon(String path, bool active) {
+    return Container(
+      width: 24.w,
+      height: 24.w,
+      alignment: Alignment.center,
+      margin: EdgeInsets.only(bottom: 2.h),
+      child: Image.asset(
+        path,
+        width: 22.w,
+        height: 22.w,
+        fit: BoxFit.contain,
+        color: active ? AppColors.maroon : AppColors.textDark.withValues(alpha: 0.4),
+      ),
     );
   }
 }

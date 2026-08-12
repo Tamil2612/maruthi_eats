@@ -8,7 +8,7 @@
   <meta name="description" content="Maruthi Eats - Premium Food Delivery">
 
   <!-- iOS meta tags & icons -->
-  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Maruthi Eats">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
@@ -18,8 +18,37 @@
 
   <title>Maruthi Eats</title>
   <link rel="manifest" href="manifest.json">
+
+  <!-- Standard Google Maps Script (Safer for plugin) -->
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDz2KW1h6YM76ET5Py2wA2pJYnWpw14oUM"></script>
+
+  <script>
+    // Global JS Error Listener
+    window.onerror = function(message, source, lineno, colno, error) {
+      console.error("[GLOBAL JS ERROR]:", message, "at", source, ":", lineno, ":", colno);
+      return false;
+    };
+  </script>
 </head>
 <body>
+  <div id="loading-indicator" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif; background-color: #FFF8E7; color: #800020;">
+    <div style="font-size: 24px; font-weight: bold; margin-bottom: 16px;">MARUTHI EATS</div>
+    <div style="font-size: 14px;">Preparing your experience...</div>
+  </div>
+
   <script src="flutter_bootstrap.js" async></script>
+
+  <script>
+    window.addEventListener('load', function() {
+      var observer = new MutationObserver(function(mutations) {
+        if (document.querySelector('flt-glass-pane')) {
+          var loader = document.getElementById('loading-indicator');
+          if (loader) loader.remove();
+          observer.disconnect();
+        }
+      });
+      observer.observe(document.body, { childList: true });
+    });
+  </script>
 </body>
 </html>

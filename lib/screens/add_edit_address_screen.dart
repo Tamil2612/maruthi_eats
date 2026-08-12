@@ -6,6 +6,7 @@ import 'package:geocoding/geocoding.dart' as geo;
 import '../models/address_model.dart';
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class AddEditAddressScreen extends StatefulWidget {
   final AddressModel? address;
@@ -92,21 +93,24 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
     _mapController?.animateCamera(CameraUpdate.newLatLng(location));
 
     try {
-      List<geo.Placemark> placemarks = await geo.Geocoding()
-          .placemarkFromCoordinates(location.latitude, location.longitude);
-      if (placemarks.isNotEmpty) {
-        final p = placemarks.first;
-        final components = [
-          p.name,
-          p.subLocality,
-          p.locality,
-          p.postalCode,
-        ].where((s) => s != null && s.isNotEmpty && s!.toLowerCase() != "null").toList();
-        
-        final addr = components.join(", ");
-        setState(() {
-          _addressController.text = addr;
-        });
+      // Geocoding package does NOT support Web. Skip auto-address on browsers to prevent crash.
+      if (!kIsWeb) {
+        List<geo.Placemark> placemarks = await geo.Geocoding()
+            .placemarkFromCoordinates(location.latitude, location.longitude);
+        if (placemarks.isNotEmpty) {
+          final p = placemarks.first;
+          final components = [
+            p.name,
+            p.subLocality,
+            p.locality,
+            p.postalCode,
+          ].where((s) => s != null && s.isNotEmpty && s!.toLowerCase() != "null").toList();
+          
+          final addr = components.join(", ");
+          setState(() {
+            _addressController.text = addr;
+          });
+        }
       }
     } catch (e) {
       debugPrint("Reverse geocoding error: $e");
