@@ -28,6 +28,8 @@ dependencies:
   geocoding: ^5.0.0
   carousel_slider: ^5.1.2
   flutter_launcher_icons: ^0.14.4
+  cached_network_image: ^3.4.1
+  shimmer: ^3.0.0
 
 dev_dependencies:
   flutter_test:

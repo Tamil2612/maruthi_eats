@@ -153,6 +153,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ),
             24.verticalSpace,
             const Divider(),
+            16.verticalSpace,
+            _CheckoutBillDetails(cart: cart),
+            40.verticalSpace,
           ],
         ),
       ),
@@ -174,10 +177,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text('Total Payable', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500)),
-                  Text('₹${cart.subtotal.toStringAsFixed(0)}',
+                  Text('₹${cart.totalPayable.toStringAsFixed(0)}',
                       style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w800, color: AppColors.maroon)),
                 ],
               ),
+              if (cart.couponDiscount > 0)
+                Padding(
+                  padding: EdgeInsets.only(top: 4.h),
+                  child: Text(
+                    'Savings of ₹${cart.couponDiscount.toStringAsFixed(0)} applied!',
+                    style: TextStyle(fontSize: 11.sp, color: AppColors.success, fontWeight: FontWeight.w600),
+                  ),
+                ),
               20.verticalSpace,
               SizedBox(
                 width: double.infinity,
@@ -219,7 +230,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       final orderRef = await FirebaseFirestore.instance.collection('orders').add({
         'customer_id': userId,
         'items': cart.items.values.map((c) => c.toOrderMap()).toList(),
-        'total': cart.subtotal,
+        'item_total': cart.subtotal,
+        'delivery_fee': cart.deliveryFee,
+        'coupon_code': cart.appliedCoupon?.code,
+        'coupon_discount': cart.couponDiscount,
+        'total': cart.totalPayable,
         'payment_mode': _payment == PaymentChoice.upi ? 'upi' : 'cod',
         'payment_status': _payment == PaymentChoice.upi ? 'pending' : 'cod_pending',
         'order_status': 'placed',
@@ -248,6 +263,51 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     } finally {
       if (mounted) setState(() => _placing = false);
     }
+  }
+}
+
+class _CheckoutBillDetails extends StatelessWidget {
+  final CartProvider cart;
+  const _CheckoutBillDetails({required this.cart});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Bill Details', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15.sp)),
+        12.verticalSpace,
+        _billRow('Item Total', cart.subtotal),
+        if (cart.couponDiscount > 0)
+          _billRow('Coupon Discount', -cart.couponDiscount, isDiscount: true),
+        _billRow('Delivery Fee', cart.deliveryFee),
+      ],
+    );
+  }
+
+  Widget _billRow(String label, double amount, {bool isDiscount = false}) {
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: 2.h),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 13.sp, 
+              color: isDiscount ? AppColors.success : AppColors.textDark.withValues(alpha: 0.6)
+            ),
+          ),
+          Text(
+            '${amount < 0 ? "-" : ""}₹${amount.abs().toStringAsFixed(2)}',
+            style: TextStyle(
+              fontSize: 13.sp, 
+              color: isDiscount ? AppColors.success : AppColors.textDark.withValues(alpha: 0.8)
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

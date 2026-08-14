@@ -35,12 +35,13 @@ class $AssetsBannersGen {
 class $AssetsIconsGen {
   const $AssetsIconsGen();
 
-  final AssetGenImage animationPng512 =
-      const AssetGenImage('assets/icons/animation-png_512.png');
   final AssetGenImage cart = const AssetGenImage('assets/icons/cart.png');
   final AssetGenImage home = const AssetGenImage('assets/icons/home.png');
   final AssetGenImage menu = const AssetGenImage('assets/icons/menu.png');
   final AssetGenImage orders = const AssetGenImage('assets/icons/orders.png');
+  final AssetGenImage placeholderFood =
+      const AssetGenImage('assets/icons/placeholder_food.png');
+  final AssetGenImage profile = const AssetGenImage('assets/icons/profile.png');
 }
 
 class $AssetsLogoGen {

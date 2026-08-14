@@ -74,7 +74,37 @@ class OrderTrackingScreen extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Total', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp)),
+                    Text('Item Total', style: TextStyle(fontSize: 13.sp, color: AppColors.textDark.withValues(alpha: 0.6))),
+                    Text('₹${order.itemTotal.toStringAsFixed(0)}', style: TextStyle(fontSize: 13.sp)),
+                  ],
+                ),
+                if (order.couponDiscount > 0)
+                  Padding(
+                    padding: EdgeInsets.only(top: 4.h),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Coupon Discount', style: TextStyle(fontSize: 13.sp, color: AppColors.success)),
+                        Text('-₹${order.couponDiscount.toStringAsFixed(0)}', style: TextStyle(fontSize: 13.sp, color: AppColors.success)),
+                      ],
+                    ),
+                  ),
+                if (order.deliveryFee > 0)
+                  Padding(
+                    padding: EdgeInsets.only(top: 4.h),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Delivery Fee', style: TextStyle(fontSize: 13.sp, color: AppColors.textDark.withValues(alpha: 0.6))),
+                        Text('₹${order.deliveryFee.toStringAsFixed(0)}', style: TextStyle(fontSize: 13.sp)),
+                      ],
+                    ),
+                  ),
+                const Divider(),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Total Amount', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp)),
                     Text('₹${order.total.toStringAsFixed(0)}',
                         style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.maroon, fontSize: 15.sp)),
                   ],

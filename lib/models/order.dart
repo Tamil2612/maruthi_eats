@@ -44,6 +44,11 @@ class OrderModel {
   final String customerId;
   final List<Map<String, dynamic>> items;
   final double total;
+  final double itemTotal;
+  final double deliveryFee;
+  final double taxes;
+  final String? couponCode;
+  final double couponDiscount;
   final String paymentMode; // 'upi' | 'cod'
   final String paymentStatus;
   final OrderStatus orderStatus;
@@ -55,6 +60,11 @@ class OrderModel {
     required this.customerId,
     required this.items,
     required this.total,
+    required this.itemTotal,
+    required this.deliveryFee,
+    required this.taxes,
+    this.couponCode,
+    this.couponDiscount = 0.0,
     required this.paymentMode,
     required this.paymentStatus,
     required this.orderStatus,
@@ -68,6 +78,11 @@ class OrderModel {
       customerId: data['customer_id'] ?? '',
       items: List<Map<String, dynamic>>.from(data['items'] ?? []),
       total: (data['total'] ?? 0).toDouble(),
+      itemTotal: (data['item_total'] ?? (data['total'] ?? 0)).toDouble(),
+      deliveryFee: (data['delivery_fee'] ?? 0).toDouble(),
+      taxes: (data['taxes'] ?? 0).toDouble(),
+      couponCode: data['coupon_code'],
+      couponDiscount: (data['coupon_discount'] ?? 0.0).toDouble(),
       paymentMode: data['payment_mode'] ?? 'cod',
       paymentStatus: data['payment_status'] ?? 'pending',
       orderStatus: orderStatusFromString(data['order_status'] ?? 'placed'),

@@ -6,39 +6,15 @@ import 'providers/cart_provider.dart';
 import 'theme/app_theme.dart';
 import 'screens/splash_screen.dart';
 import 'firebase_options.dart';
-import 'package:flutter/foundation.dart';
 
 void main() async {
-  // Capture all Flutter-level errors
-  FlutterError.onError = (details) {
-    print("[BOOTSTRAP ERROR] FlutterError: ${details.exception}");
-    FlutterError.presentError(details);
-  };
+  WidgetsFlutterBinding.ensureInitialized();
 
-  // Capture errors that happen outside of the Flutter framework (e.g. async/timers)
-  PlatformDispatcher.instance.onError = (error, stack) {
-    print("[BOOTSTRAP ERROR] PlatformDispatcher: $error");
-    return true;
-  };
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
 
-  print("[BOOTSTRAP] 1: main() started");
-
-  try {
-    WidgetsFlutterBinding.ensureInitialized();
-    print("[BOOTSTRAP] 2: WidgetsFlutterBinding initialized");
-
-    print("[BOOTSTRAP] 3: Starting Firebase initialization");
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-    print("[BOOTSTRAP] 4: Firebase initialized successfully");
-
-    runApp(const MaruthiEatsApp());
-    print("[BOOTSTRAP] 5: runApp executed");
-  } catch (e, stack) {
-    print("[BOOTSTRAP CRASH]: $e");
-    print(stack);
-  }
+  runApp(const MaruthiEatsApp());
 }
 
 class MaruthiEatsApp extends StatelessWidget {
