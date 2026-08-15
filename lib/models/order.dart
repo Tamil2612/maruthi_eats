@@ -53,6 +53,7 @@ class OrderModel {
   final String paymentStatus;
   final OrderStatus orderStatus;
   final String deliveryAddress;
+  final String? addressLabel;
   final DateTime? createdAt;
 
   OrderModel({
@@ -69,6 +70,7 @@ class OrderModel {
     required this.paymentStatus,
     required this.orderStatus,
     required this.deliveryAddress,
+    this.addressLabel,
     this.createdAt,
   });
 
@@ -87,6 +89,7 @@ class OrderModel {
       paymentStatus: data['payment_status'] ?? 'pending',
       orderStatus: orderStatusFromString(data['order_status'] ?? 'placed'),
       deliveryAddress: data['delivery_address'] ?? '',
+      addressLabel: data['address_label'],
       createdAt: (data['created_at'] is Timestamp)
           ? (data['created_at'] as Timestamp).toDate()
           : null,

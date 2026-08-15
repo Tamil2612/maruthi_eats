@@ -25,6 +25,7 @@ class OffersListScreen extends StatelessWidget {
 
           final offers = snapshot.data!.docs
               .map((doc) => OfferModel.fromFirestore(doc.id, doc.data() as Map<String, dynamic>))
+              .where((o) => o.expiryDate == null || o.expiryDate!.isAfter(DateTime.now()))
               .toList();
 
           if (offers.isEmpty) {
@@ -164,8 +165,8 @@ class _TypeBadge extends StatelessWidget {
       child: Text(
         isCombo ? 'COMBO' : 'SPECIAL',
         style: TextStyle(
-          fontSize: 9.sp, 
-          fontWeight: FontWeight.w900, 
+          fontSize: 9.sp,
+          fontWeight: FontWeight.w900,
           color: isCombo ? Colors.blue.shade800 : Colors.orange.shade800,
           letterSpacing: 0.5,
         ),

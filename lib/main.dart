@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'providers/cart_provider.dart';
+import 'providers/address_provider.dart';
 import 'theme/app_theme.dart';
 import 'screens/splash_screen.dart';
 import 'firebase_options.dart';
@@ -27,8 +28,11 @@ class MaruthiEatsApp extends StatelessWidget {
       minTextAdapt: true,
       splitScreenMode: true,
       builder: (_, child) {
-        return ChangeNotifierProvider(
-          create: (_) => CartProvider(),
+        return MultiProvider(
+          providers: [
+            ChangeNotifierProvider(create: (_) => CartProvider()),
+            ChangeNotifierProvider(create: (_) => AddressProvider()),
+          ],
           child: MaterialApp(
             title: 'Maruthi Eats',
             debugShowCheckedModeBanner: false,

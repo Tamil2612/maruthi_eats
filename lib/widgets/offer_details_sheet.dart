@@ -11,6 +11,7 @@ import 'skeleton_loaders.dart';
 
 class OfferDetailsSheet extends StatefulWidget {
   final OfferModel offer;
+
   const OfferDetailsSheet({super.key, required this.offer});
 
   @override
@@ -21,6 +22,14 @@ class _OfferDetailsSheetState extends State<OfferDetailsSheet> {
   MenuItem? _buyItem;
   MenuItem? _getItem;
   bool _loadingItems = false;
+
+  /// True once loading has finished for a BOGO offer but one or both of
+  /// the linked menu items couldn't be fetched (e.g. deleted from the
+  /// menu). Prevents "ADD TO CART" from silently doing nothing.
+  bool get _bogoItemsMissing =>
+      !_loadingItems &&
+      widget.offer.type == OfferType.bogo &&
+      (_buyItem == null || _getItem == null);
 
   @override
   void initState() {
@@ -34,10 +43,11 @@ class _OfferDetailsSheetState extends State<OfferDetailsSheet> {
     setState(() => _loadingItems = true);
     try {
       final db = FirebaseFirestore.instance;
-      
+
       // Fetch Buy Item
       if (widget.offer.buyItemId != null) {
-        final buyDoc = await db.collection('menu_items').doc(widget.offer.buyItemId).get();
+        final buyDoc =
+            await db.collection('menu_items').doc(widget.offer.buyItemId).get();
         if (buyDoc.exists) {
           _buyItem = MenuItem.fromFirestore(buyDoc.id, buyDoc.data()!);
         }
@@ -45,7 +55,8 @@ class _OfferDetailsSheetState extends State<OfferDetailsSheet> {
 
       // Fetch Get Item
       if (widget.offer.getItemId != null) {
-        final getDoc = await db.collection('menu_items').doc(widget.offer.getItemId).get();
+        final getDoc =
+            await db.collection('menu_items').doc(widget.offer.getItemId).get();
         if (getDoc.exists) {
           _getItem = MenuItem.fromFirestore(getDoc.id, getDoc.data()!);
         }
@@ -91,22 +102,28 @@ class _OfferDetailsSheetState extends State<OfferDetailsSheet> {
                       borderRadius: BorderRadius.circular(16.r),
                       child: CachedNetworkImage(
                         imageUrl: offer.imageUrl,
-                        height: 200.h,
+                        height: 160.h,
                         width: double.infinity,
-                        fit: BoxFit.cover,
-                        placeholder: (context, url) => ShimmerLoader(child: Container(color: Colors.white)),
-                        errorWidget: (context, url, error) => Image.asset('assets/icons/placeholder_food.png', fit: BoxFit.cover),
+                        fit: BoxFit.fill,
+                        placeholder: (context, url) => ShimmerLoader(
+                            child: Container(color: Colors.white)),
+                        errorWidget: (context, url, error) => Image.asset(
+                            'assets/icons/placeholder_food.png',
+                            fit: BoxFit.cover),
                       ),
                     ),
                   20.verticalSpace,
-                  
+
                   // Title & Badge
                   Row(
                     children: [
                       Expanded(
                         child: Text(
                           offer.title,
-                          style: TextStyle(fontSize: 20.sp, fontWeight: FontWeight.w900, color: AppColors.maroon),
+                          style: TextStyle(
+                              fontSize: 20.sp,
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.maroon),
                         ),
                       ),
                       _buildTypeBadge(offer.type),
@@ -115,29 +132,43 @@ class _OfferDetailsSheetState extends State<OfferDetailsSheet> {
                   8.verticalSpace,
                   Text(
                     offer.description,
-                    style: TextStyle(fontSize: 14.sp, color: AppColors.textDark.withValues(alpha: 0.6), height: 1.4),
+                    style: TextStyle(
+                        fontSize: 14.sp,
+                        color: AppColors.textDark.withValues(alpha: 0.6),
+                        height: 1.4),
                   ),
                   24.verticalSpace,
 
                   // Items Section
                   Text(
-                    offer.type == OfferType.combo ? 'What\u0027s in the bundle:' : 'Offer Details:',
-                    style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w800),
+                    offer.type == OfferType.combo
+                        ? 'What\u0027s in the bundle:'
+                        : 'Offer Details:',
+                    style:
+                        TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w800),
                   ),
                   16.verticalSpace,
-                  
+
                   if (_loadingItems)
-                    const Center(child: CircularProgressIndicator(color: AppColors.maroon))
+                    const Center(
+                        child:
+                            CircularProgressIndicator(color: AppColors.maroon))
                   else if (offer.type == OfferType.combo)
-                    ...offer.bundleItems.map((item) => _itemRow(item.itemName, item.qty))
+                    ...offer.bundleItems
+                        .map((item) => _itemRow(item.itemName, item.qty))
                   else
                     Column(
                       children: [
-                        _bogoRow('Buy', offer.buyItemName ?? 'Item', offer.buyQty, isMain: true),
+                        _bogoRow(
+                            'Buy', offer.buyItemName ?? 'Item', offer.buyQty,
+                            isMain: true),
                         12.verticalSpace,
-                        Icon(Icons.add, color: AppColors.maroon.withValues(alpha: 0.3)),
+                        Icon(Icons.add,
+                            color: AppColors.maroon.withValues(alpha: 0.3)),
                         12.verticalSpace,
-                        _bogoRow('Get FREE', offer.getItemName ?? 'Item', offer.getQty, isReward: true),
+                        _bogoRow('Get FREE', offer.getItemName ?? 'Item',
+                            offer.getQty,
+                            isReward: true),
                       ],
                     ),
 
@@ -149,12 +180,21 @@ class _OfferDetailsSheetState extends State<OfferDetailsSheet> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Offer Price', style: TextStyle(fontSize: 12.sp, color: AppColors.textDark.withValues(alpha: 0.5))),
+                          Text('Offer Price',
+                              style: TextStyle(
+                                  fontSize: 12.sp,
+                                  color: AppColors.textDark
+                                      .withValues(alpha: 0.5))),
                           Text(
-                            offer.type == OfferType.combo 
-                                ? '₹${offer.comboPrice.toStringAsFixed(0)}' 
-                                : _buyItem != null ? '₹${(_buyItem!.effectivePrice * offer.buyQty).toStringAsFixed(0)}' : '---',
-                            style: TextStyle(fontSize: 24.sp, fontWeight: FontWeight.w900, color: AppColors.maroon),
+                            offer.type == OfferType.combo
+                                ? '₹${offer.comboPrice.toStringAsFixed(0)}'
+                                : _buyItem != null
+                                    ? '₹${(_buyItem!.effectivePrice * offer.buyQty).toStringAsFixed(0)}'
+                                    : '---',
+                            style: TextStyle(
+                                fontSize: 24.sp,
+                                fontWeight: FontWeight.w900,
+                                color: AppColors.maroon),
                           ),
                         ],
                       ),
@@ -163,14 +203,21 @@ class _OfferDetailsSheetState extends State<OfferDetailsSheet> {
                         child: SizedBox(
                           height: 56.h,
                           child: ElevatedButton(
-                            onPressed: _loadingItems ? null : () {
-                              context.read<CartProvider>().addOffer(offer, buyItem: _buyItem, getItem: _getItem);
-                              Navigator.pop(context);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Offer added to cart!')),
-                              );
-                            },
-                            child: const Text('ADD TO CART'),
+                            onPressed: _loadingItems || _bogoItemsMissing
+                                ? null
+                                : () {
+                                    context.read<CartProvider>().addOffer(offer,
+                                        buyItem: _buyItem, getItem: _getItem);
+                                    Navigator.pop(context);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                          content:
+                                              Text('Offer added to cart!')),
+                                    );
+                                  },
+                            child: Text(_bogoItemsMissing
+                                ? 'UNAVAILABLE'
+                                : 'ADD TO CART'),
                           ),
                         ),
                       ),
@@ -196,8 +243,8 @@ class _OfferDetailsSheetState extends State<OfferDetailsSheet> {
       child: Text(
         isCombo ? 'COMBO' : 'SPECIAL',
         style: TextStyle(
-          fontSize: 10.sp, 
-          fontWeight: FontWeight.w900, 
+          fontSize: 10.sp,
+          fontWeight: FontWeight.w900,
           color: isCombo ? Colors.blue.shade800 : Colors.orange.shade800,
         ),
       ),
@@ -209,29 +256,51 @@ class _OfferDetailsSheetState extends State<OfferDetailsSheet> {
       padding: EdgeInsets.only(bottom: 12.h),
       child: Row(
         children: [
-          Icon(Icons.check_circle_outline, size: 18.r, color: AppColors.success),
+          Icon(Icons.check_circle_outline,
+              size: 18.r, color: AppColors.success),
           12.horizontalSpace,
-          Expanded(child: Text(name, style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w500))),
-          Text('x$qty', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.bold, color: AppColors.maroon)),
+          Expanded(
+              child: Text(name,
+                  style:
+                      TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w500))),
+          Text('x$qty',
+              style: TextStyle(
+                  fontSize: 14.sp,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.maroon)),
         ],
       ),
     );
   }
 
-  Widget _bogoRow(String prefix, String name, int qty, {bool isMain = false, bool isReward = false}) {
+  Widget _bogoRow(String prefix, String name, int qty,
+      {bool isMain = false, bool isReward = false}) {
     return Container(
       padding: EdgeInsets.all(12.r),
       decoration: BoxDecoration(
-        color: isReward ? AppColors.success.withValues(alpha: 0.05) : AppColors.cream,
+        color: isReward
+            ? AppColors.success.withValues(alpha: 0.05)
+            : AppColors.cream,
         borderRadius: BorderRadius.circular(12.r),
-        border: Border.all(color: isReward ? AppColors.success.withValues(alpha: 0.1) : AppColors.maroon.withValues(alpha: 0.05)),
+        border: Border.all(
+            color: isReward
+                ? AppColors.success.withValues(alpha: 0.1)
+                : AppColors.maroon.withValues(alpha: 0.05)),
       ),
       child: Row(
         children: [
-          Text(prefix, style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.bold, color: isReward ? AppColors.success : AppColors.textDark)),
+          Text(prefix,
+              style: TextStyle(
+                  fontSize: 12.sp,
+                  fontWeight: FontWeight.bold,
+                  color: isReward ? AppColors.success : AppColors.textDark)),
           12.horizontalSpace,
-          Expanded(child: Text(name, style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600))),
-          Text('x$qty', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w900)),
+          Expanded(
+              child: Text(name,
+                  style:
+                      TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600))),
+          Text('x$qty',
+              style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w900)),
         ],
       ),
     );

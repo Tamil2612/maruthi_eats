@@ -5,6 +5,7 @@ import '../theme/app_theme.dart';
 
 class ShimmerLoader extends StatelessWidget {
   final Widget child;
+
   const ShimmerLoader({super.key, required this.child});
 
   @override
@@ -113,6 +114,29 @@ class CategorySkeleton extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class BannerSkeleton extends StatelessWidget {
+  const BannerSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return ShimmerLoader(
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 16.w),
+        child: AspectRatio(
+          aspectRatio: 2.0,
+          child: Container(
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16.r),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

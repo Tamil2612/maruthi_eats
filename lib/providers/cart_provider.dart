@@ -22,7 +22,10 @@ class CartProvider extends ChangeNotifier {
   }
 
   double get deliveryFee => isEmpty ? 0.0 : 30.0;
-  double get totalPayable => (subtotal - couponDiscount) + deliveryFee;
+  double get totalPayable {
+    final payable = (subtotal - couponDiscount) + deliveryFee;
+    return payable < 0 ? 0.0 : payable;
+  }
 
   bool get isEmpty => _items.isEmpty;
 
@@ -39,6 +42,7 @@ class CartProvider extends ChangeNotifier {
         menuItem: menuItem,
       );
     }
+    _revalidateCoupon();
     notifyListeners();
   }
 
@@ -54,48 +58,56 @@ class CartProvider extends ChangeNotifier {
           name: offer.title,
           unitPrice: offer.comboPrice,
           imageUrl: offer.imageUrl,
-          isVeg: true, 
+          isVeg: true,
           isOffer: true,
           offerDescription: desc,
           offerModel: offer,
         );
       }
     } else if (offer.type == OfferType.bogo && buyItem != null && getItem != null) {
-      // For BOGO, we add two items linked by a group ID
-      final groupId = 'bogo_${offer.id}_${DateTime.now().millisecondsSinceEpoch}';
+      // Predictable ID for BOGO to allow stacking if added multiple times
+      final groupId = 'bogo_${offer.id}';
       
-      // 1. Add the paid item
-      final buyId = '${groupId}_buy';
-      _items[buyId] = CartItem(
-        id: buyId,
-        name: buyItem.name,
-        unitPrice: buyItem.effectivePrice,
-        quantity: offer.buyQty,
-        imageUrl: buyItem.imageUrl,
-        isVeg: buyItem.isVeg,
-        isOffer: true,
-        parentOfferId: groupId,
-        menuItem: buyItem,
-        offerDescription: 'Part of: ${offer.title}',
-      );
+      if (_items.containsKey('${groupId}_buy')) {
+        _items['${groupId}_buy']!.quantity += offer.buyQty;
+        _items['${groupId}_get']!.quantity += offer.getQty;
+      } else {
+        // 1. Add the paid item
+        final buyId = '${groupId}_buy';
+        _items[buyId] = CartItem(
+          id: buyId,
+          name: buyItem.name,
+          unitPrice: buyItem.effectivePrice,
+          quantity: offer.buyQty,
+          imageUrl: buyItem.imageUrl,
+          isVeg: buyItem.isVeg,
+          isOffer: true,
+          parentOfferId: groupId,
+          menuItem: buyItem,
+          offerModel: offer,
+          offerDescription: 'Part of: ${offer.title}',
+        );
 
-      // 2. Add the free item
-      final getId = '${groupId}_get';
-      _items[getId] = CartItem(
-        id: getId,
-        name: getItem.name,
-        unitPrice: 0.0,
-        originalPrice: getItem.effectivePrice,
-        quantity: offer.getQty,
-        imageUrl: getItem.imageUrl,
-        isVeg: getItem.isVeg,
-        isOffer: true,
-        isFree: true,
-        parentOfferId: groupId,
-        menuItem: getItem,
-        offerDescription: 'FREE with ${offer.title}',
-      );
+        // 2. Add the free item
+        final getId = '${groupId}_get';
+        _items[getId] = CartItem(
+          id: getId,
+          name: getItem.name,
+          unitPrice: 0.0,
+          originalPrice: getItem.effectivePrice,
+          quantity: offer.getQty,
+          imageUrl: getItem.imageUrl,
+          isVeg: getItem.isVeg,
+          isOffer: true,
+          isFree: true,
+          parentOfferId: groupId,
+          menuItem: getItem,
+          offerModel: offer,
+          offerDescription: 'FREE with ${offer.title}',
+        );
+      }
     }
+    _revalidateCoupon();
     notifyListeners();
   }
 
@@ -111,18 +123,63 @@ class CartProvider extends ChangeNotifier {
         isVeg: freshItem.isVeg,
         menuItem: freshItem,
       );
+      _revalidateCoupon();
       notifyListeners();
     }
   }
 
-  void removeOne(String itemId) {
+  void incrementItem(String itemId) {
     if (!_items.containsKey(itemId)) return;
     
     final item = _items[itemId]!;
-    if (item.parentOfferId != null) {
-      // Atomic removal for linked BOGO items
+    if (item.parentOfferId != null && item.offerModel != null) {
       final parentId = item.parentOfferId;
-      _items.removeWhere((key, value) => value.parentOfferId == parentId);
+      final offer = item.offerModel!;
+      
+      // Increment all items in this BOGO set by their respective offer quantities
+      _items.forEach((key, val) {
+        if (val.parentOfferId == parentId) {
+          if (key.endsWith('_buy')) {
+            val.quantity += offer.buyQty;
+          } else if (key.endsWith('_get')) {
+            val.quantity += offer.getQty;
+          }
+        }
+      });
+    } else {
+      _items[itemId]!.quantity++;
+    }
+    _revalidateCoupon();
+    notifyListeners();
+  }
+
+  /// Returns true if removing this item caused the applied coupon to be
+  /// dropped (e.g. subtotal fell below the coupon's minimum order value),
+  /// so the UI can inform the user.
+  bool removeOne(String itemId) {
+    if (!_items.containsKey(itemId)) return false;
+
+    final item = _items[itemId]!;
+    if (item.parentOfferId != null && item.offerModel != null) {
+      final parentId = item.parentOfferId;
+      final offer = item.offerModel!;
+      
+      // Check if we can decrement the set or must remove it
+      final canDecrement = item.quantity > offer.buyQty; // buy and get have same ratio multipliers
+      
+      if (canDecrement) {
+        _items.forEach((key, val) {
+          if (val.parentOfferId == parentId) {
+            if (key.endsWith('_buy')) {
+              val.quantity -= offer.buyQty;
+            } else if (key.endsWith('_get')) {
+              val.quantity -= offer.getQty;
+            }
+          }
+        });
+      } else {
+        _items.removeWhere((key, value) => value.parentOfferId == parentId);
+      }
     } else {
       if (item.quantity > 1) {
         item.quantity--;
@@ -130,7 +187,9 @@ class CartProvider extends ChangeNotifier {
         _items.remove(itemId);
       }
     }
+    final couponDropped = _revalidateCoupon();
     notifyListeners();
+    return couponDropped;
   }
 
   int quantityOf(String itemId) => _items[itemId]?.quantity ?? 0;
@@ -149,5 +208,23 @@ class CartProvider extends ChangeNotifier {
     _items.clear();
     _appliedCoupon = null;
     notifyListeners();
+  }
+
+  /// Drops the applied coupon if the cart no longer meets its terms
+  /// (min order value, expiry, or active flag). Called after every
+  /// mutation that can change the subtotal so a coupon applied on a
+  /// larger cart can't silently keep discounting a smaller one.
+  bool _revalidateCoupon() {
+    final coupon = _appliedCoupon;
+    if (coupon == null) return false;
+
+    final expired = coupon.expiryDate != null && coupon.expiryDate!.isBefore(DateTime.now());
+    final belowMinOrder = subtotal < coupon.minOrderValue;
+
+    if (!coupon.isActive || expired || belowMinOrder) {
+      _appliedCoupon = null;
+      return true;
+    }
+    return false;
   }
 }

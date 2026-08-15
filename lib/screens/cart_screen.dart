@@ -1,11 +1,14 @@
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import '../providers/cart_provider.dart';
+import '../providers/address_provider.dart';
 import '../theme/app_theme.dart';
 import 'package:flutter/material.dart';
+import '../models/address_model.dart';
 import 'checkout_screen.dart';
 import 'full_menu_screen.dart';
 import 'coupons_screen.dart';
+import 'saved_addresses_screen.dart';
 
 class CartScreen extends StatelessWidget {
   const CartScreen({super.key});
@@ -23,59 +26,63 @@ class CartScreen extends StatelessWidget {
       body: items.isEmpty
           ? _buildEmptyState(context)
           : Column(
+        children: [
+          Expanded(
+            child: ListView(
+              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 16.h),
               children: [
-                Expanded(
-                  child: ListView(
-                    padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 16.h),
-                    children: [
-                      // Cart Items
-                      ...items.map((item) => _CartItemRow(item: item)),
+                // Delivery Address Shortcut
+                const _DeliveryAddressCard(),
+                24.verticalSpace,
 
-                      // Add More Items Button
-                      TextButton.icon(
-                        onPressed: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const FullMenuScreen()),
-                        ),
-                        icon: Icon(Icons.add_circle_outline, size: 20.r, color: AppColors.maroon),
-                        label: Text(
-                          'Add more items',
-                          style: TextStyle(
-                            color: AppColors.maroon,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 13.sp,
-                          ),
-                        ),
-                        style: TextButton.styleFrom(
-                          alignment: Alignment.centerLeft,
-                          padding: EdgeInsets.symmetric(vertical: 16.h),
-                        ),
-                      ),
-                      
-                      const Divider(),
-                      24.verticalSpace,
+                // Cart Items
+                ...items.map((item) => _CartItemRow(item: item)),
 
-                      // Coupon Section
-                      const _CouponSection(),
-                      24.verticalSpace,
-                      const Divider(thickness: 1),
-                      24.verticalSpace,
-
-                      // Bill Details Section
-                      _BillDetails(cart: cart),
-                      
-                      32.verticalSpace,
-                      
-                      // Cancellation Policy
-                      _CancellationPolicy(),
-                      
-                      100.verticalSpace,
-                    ],
+                // Add More Items Button
+                TextButton.icon(
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const FullMenuScreen()),
+                  ),
+                  icon: Icon(Icons.add_circle_outline, size: 20.r, color: AppColors.maroon),
+                  label: Text(
+                    'Add more items',
+                    style: TextStyle(
+                      color: AppColors.maroon,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13.sp,
+                    ),
+                  ),
+                  style: TextButton.styleFrom(
+                    alignment: Alignment.centerLeft,
+                    padding: EdgeInsets.symmetric(vertical: 16.h),
                   ),
                 ),
-                _StickyCheckoutBar(cart: cart),
+
+                const Divider(),
+                24.verticalSpace,
+
+                // Coupon Section
+                const _CouponSection(),
+                24.verticalSpace,
+                const Divider(thickness: 1),
+                24.verticalSpace,
+
+                // Bill Details Section
+                _BillDetails(cart: cart),
+
+                32.verticalSpace,
+
+                // Cancellation Policy
+                _CancellationPolicy(),
+
+                100.verticalSpace,
               ],
             ),
+          ),
+          _StickyCheckoutBar(cart: cart),
+        ],
+      ),
     );
   }
 
@@ -114,56 +121,48 @@ class _CartItemRow extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Item Details (Tag + Name)
+          // Item Details (Name + Tag)
           Expanded(
-            child: Row(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Veg/Non-veg Icon - First in the row
-                if (!item.isOffer)
-                  Container(
-                    margin: EdgeInsets.only(top: 4.h),
-                    padding: EdgeInsets.all(2.r),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: item.isVeg ? AppColors.success : AppColors.error, width: 1.w),
-                      borderRadius: BorderRadius.circular(2.r),
-                    ),
-                    child: Icon(
-                      Icons.circle,
-                      size: 6.r,
-                      color: item.isVeg ? AppColors.success : AppColors.error,
-                    ),
-                  )
-                else
-                  Padding(
-                    padding: EdgeInsets.only(top: 4.h),
-                    child: Icon(
-                      item.isFree ? Icons.card_giftcard : Icons.stars, 
-                      size: 14.r, 
-                      color: item.isFree ? AppColors.success : AppColors.gold
-                    ),
-                  ),
-                12.horizontalSpace,
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                RichText(
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  text: TextSpan(
+                    style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600, color: AppColors.textDark, fontFamily: 'Poppins'),
                     children: [
-                      Text(
-                        item.name,
-                        style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
+                      TextSpan(text: item.name),
+                      const WidgetSpan(child: SizedBox(width: 8)),
+                      WidgetSpan(
+                        alignment: PlaceholderAlignment.middle,
+                        child: item.isOffer 
+                          ? Icon(item.isFree ? Icons.card_giftcard : Icons.stars, 
+                              size: 14.r, 
+                              color: item.isFree ? AppColors.success : AppColors.gold)
+                          : Container(
+                              padding: EdgeInsets.all(2.r),
+                              decoration: BoxDecoration(
+                                border: Border.all(color: item.isVeg ? AppColors.success : AppColors.error, width: 1.w),
+                                borderRadius: BorderRadius.circular(2.r),
+                              ),
+                              child: Icon(
+                                Icons.circle,
+                                size: 6.r,
+                                color: item.isVeg ? AppColors.success : AppColors.error,
+                              ),
+                            ),
                       ),
-                      if (item.offerDescription != null) ...[
-                        2.verticalSpace,
-                        Text(
-                          item.offerDescription!,
-                          style: TextStyle(fontSize: 11.sp, color: AppColors.textDark.withValues(alpha: 0.5), height: 1.2),
-                        ),
-                      ],
                     ],
                   ),
                 ),
+                if (item.offerDescription != null) ...[
+                  2.verticalSpace,
+                  Text(
+                    item.offerDescription!,
+                    style: TextStyle(fontSize: 11.sp, color: AppColors.textDark.withValues(alpha: 0.5), height: 1.2),
+                  ),
+                ],
               ],
             ),
           ),
@@ -174,55 +173,53 @@ class _CartItemRow extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               if (!item.isFree) // Free items don't have their own stepper
-              Container(
-                height: 30.h,
-                decoration: BoxDecoration(
-                  color: AppColors.white,
-                  border: Border.all(color: AppColors.maroon.withValues(alpha: 0.2)),
-                  borderRadius: BorderRadius.circular(8.r),
-                  boxShadow: [
-                    BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 4, offset: const Offset(0, 2)),
-                  ],
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    InkWell(
-                      onTap: () => context.read<CartProvider>().removeOne(item.id),
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 8.w),
-                        child: Icon(Icons.remove, size: 14.r, color: AppColors.maroon),
-                      ),
-                    ),
-                    Text(
-                      '${item.quantity}',
-                      style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.bold, color: AppColors.maroon),
-                    ),
-                    InkWell(
-                      onTap: () {
-                        if (item.isOffer) {
-                          if (item.offerModel != null) {
-                            context.read<CartProvider>().addOffer(item.offerModel!);
+                Container(
+                  height: 30.h,
+                  decoration: BoxDecoration(
+                    color: AppColors.white,
+                    border: Border.all(color: AppColors.maroon.withValues(alpha: 0.2)),
+                    borderRadius: BorderRadius.circular(8.r),
+                    boxShadow: [
+                      BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 4, offset: const Offset(0, 2)),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      InkWell(
+                        onTap: () {
+                          final couponDropped = context.read<CartProvider>().removeOne(item.id);
+                          if (couponDropped) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Coupon removed as your order no longer meets its minimum value')),
+                            );
                           }
-                          // Note: For BOGO, we might need a more specific re-add logic if we want to add a whole set
-                        } else {
-                          context.read<CartProvider>().addItem(item.menuItem!);
-                        }
-                      },
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 8.w),
-                        child: Icon(Icons.add, size: 14.r, color: AppColors.maroon),
+                        },
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 8.w),
+                          child: Icon(Icons.remove, size: 14.r, color: AppColors.maroon),
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              )
-              else 
+                      Text(
+                        '${item.quantity}',
+                        style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.bold, color: AppColors.maroon),
+                      ),
+                      InkWell(
+                        onTap: () => context.read<CartProvider>().incrementItem(item.id),
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 8.w),
+                          child: Icon(Icons.add, size: 14.r, color: AppColors.maroon),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else
                 Text(
                   'LINKED DEAL',
                   style: TextStyle(fontSize: 9.sp, fontWeight: FontWeight.w800, color: AppColors.success.withValues(alpha: 0.6)),
                 ),
-              
+
               8.verticalSpace,
               // Individual Price with Discount logic
               Row(
@@ -301,8 +298,8 @@ class _CouponSection extends StatelessWidget {
                 Text(
                   coupon != null ? 'You saved ₹${cart.couponDiscount.toStringAsFixed(0)}' : 'Save more with available offers',
                   style: TextStyle(
-                    fontSize: 12.sp, 
-                    color: coupon != null ? AppColors.success : AppColors.textDark.withValues(alpha: 0.5)
+                      fontSize: 12.sp,
+                      color: coupon != null ? AppColors.success : AppColors.textDark.withValues(alpha: 0.5)
                   ),
                 ),
               ],
@@ -425,6 +422,70 @@ class _CancellationPolicy extends StatelessWidget {
             style: TextStyle(fontSize: 10.sp, color: AppColors.error, fontWeight: FontWeight.bold, decoration: TextDecoration.underline),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _DeliveryAddressCard extends StatelessWidget {
+  const _DeliveryAddressCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final addressProvider = context.watch<AddressProvider>();
+    final address = addressProvider.selectedAddress;
+
+    return InkWell(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const SavedAddressesScreen()),
+      ),
+      child: Container(
+        padding: EdgeInsets.all(16.r),
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(16.r),
+          border: Border.all(color: AppColors.maroon.withValues(alpha: 0.1)),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4)),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: EdgeInsets.all(8.r),
+              decoration: BoxDecoration(
+                color: AppColors.maroon.withValues(alpha: 0.05),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.location_on, color: AppColors.maroon, size: 20.r),
+            ),
+            16.horizontalSpace,
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        address != null ? 'Delivering to ${address.label}' : 'Set Delivery Address',
+                        style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w800),
+                      ),
+                      4.horizontalSpace,
+                      Icon(Icons.keyboard_arrow_down, size: 16.r, color: AppColors.textDark.withValues(alpha: 0.5)),
+                    ],
+                  ),
+                  Text(
+                    address?.fullAddress ?? 'Add or select an address to proceed',
+                    style: TextStyle(fontSize: 11.sp, color: AppColors.textDark.withValues(alpha: 0.5)),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

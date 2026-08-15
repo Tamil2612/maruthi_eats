@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import '../providers/cart_provider.dart';
+import '../providers/address_provider.dart';
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
@@ -21,13 +22,14 @@ class CheckoutScreen extends StatefulWidget {
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
   final _authService = AuthService();
-  AddressModel? _selectedAddress;
   PaymentChoice _payment = PaymentChoice.upi;
   bool _placing = false;
 
   @override
   Widget build(BuildContext context) {
     final cart = context.watch<CartProvider>();
+    final addressProvider = context.watch<AddressProvider>();
+    final selectedAddress = addressProvider.selectedAddress;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Checkout')),
@@ -45,94 +47,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     context,
                     MaterialPageRoute(builder: (_) => const SavedAddressesScreen()),
                   ),
-                  child: Text(_selectedAddress == null ? 'Add Address' : 'Change',
+                  child: Text(selectedAddress == null ? 'Add Address' : 'Change',
                       style: TextStyle(color: AppColors.maroon, fontWeight: FontWeight.bold, fontSize: 13.sp)),
                 ),
               ],
             ),
             8.verticalSpace,
-            StreamBuilder<List<AddressModel>>(
-              stream: _authService.watchAddresses(_authService.currentUser!.uid),
-              builder: (context, snapshot) {
-                final addresses = snapshot.data ?? [];
-                
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator(color: AppColors.maroon));
-                }
-
-                if (addresses.isEmpty) {
-                  return InkWell(
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const SavedAddressesScreen()),
-                    ),
-                    child: Container(
-                      padding: EdgeInsets.all(16.r),
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        color: AppColors.error.withValues(alpha: 0.05),
-                        borderRadius: BorderRadius.circular(12.r),
-                        border: Border.all(color: AppColors.error.withValues(alpha: 0.2)),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.location_off_outlined, color: AppColors.error),
-                          12.horizontalSpace,
-                          const Text('No address saved. Tap to add one.', style: TextStyle(color: AppColors.error)),
-                        ],
-                      ),
-                    ),
-                  );
-                }
-
-                // If nothing selected yet, pick the first one
-                if (_selectedAddress == null && addresses.isNotEmpty) {
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    setState(() => _selectedAddress = addresses.first);
-                  });
-                } else if (_selectedAddress != null) {
-                  // Ensure current selection still exists in the latest list
-                  final exists = addresses.any((a) => a.id == _selectedAddress!.id);
-                  if (!exists) {
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      setState(() => _selectedAddress = addresses.first);
-                    });
-                  } else {
-                    // Update selection with latest data (in case label changed)
-                    final updated = addresses.firstWhere((a) => a.id == _selectedAddress!.id);
-                    if (updated.fullAddress != _selectedAddress!.fullAddress || updated.label != _selectedAddress!.label) {
-                       WidgetsBinding.instance.addPostFrameCallback((_) {
-                        setState(() => _selectedAddress = updated);
-                      });
-                    }
-                  }
-                }
-
-                return Card(
-                  margin: EdgeInsets.zero,
-                  child: Padding(
-                    padding: EdgeInsets.all(16.r),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.location_on_outlined, color: AppColors.maroon),
-                        16.horizontalSpace,
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(_selectedAddress?.label ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
-                              4.verticalSpace,
-                              Text(_selectedAddress?.fullAddress ?? '', 
-                                  style: TextStyle(fontSize: 13.sp, color: AppColors.textDark.withValues(alpha: 0.6))),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
+            _buildAddressSection(context, selectedAddress, addressProvider.addresses),
             24.verticalSpace,
             Text('Payment Method', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14.sp)),
             8.verticalSpace,
@@ -215,7 +136,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Future<void> _placeOrder(BuildContext context, CartProvider cart) async {
-    if (_selectedAddress == null) {
+    final selectedAddress = context.read<AddressProvider>().selectedAddress;
+    
+    if (selectedAddress == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select a delivery address')),
       );
@@ -238,10 +161,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         'payment_mode': _payment == PaymentChoice.upi ? 'upi' : 'cod',
         'payment_status': _payment == PaymentChoice.upi ? 'pending' : 'cod_pending',
         'order_status': 'placed',
-        'delivery_address': _selectedAddress!.fullAddress,
-        'address_label': _selectedAddress!.label,
-        'latitude': _selectedAddress!.latitude,
-        'longitude': _selectedAddress!.longitude,
+        'delivery_address': selectedAddress.fullAddress,
+        'address_label': selectedAddress.label,
+        'latitude': selectedAddress.latitude,
+        'longitude': selectedAddress.longitude,
         'created_at': FieldValue.serverTimestamp(),
       });
 
@@ -263,6 +186,61 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     } finally {
       if (mounted) setState(() => _placing = false);
     }
+  }
+
+  Widget _buildAddressSection(BuildContext context, AddressModel? selectedAddress, List<AddressModel> allAddresses) {
+    if (allAddresses.isEmpty) {
+      return InkWell(
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const SavedAddressesScreen()),
+        ),
+        child: Container(
+          padding: EdgeInsets.all(16.r),
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: AppColors.error.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(12.r),
+            border: Border.all(color: AppColors.error.withValues(alpha: 0.2)),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.location_off_outlined, color: AppColors.error),
+              12.horizontalSpace,
+              const Text('No address saved. Tap to add one.', style: TextStyle(color: AppColors.error)),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (selectedAddress == null) {
+      return const Center(child: Text('Please select an address'));
+    }
+
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: EdgeInsets.all(16.r),
+        child: Row(
+          children: [
+            const Icon(Icons.location_on_outlined, color: AppColors.maroon),
+            16.horizontalSpace,
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(selectedAddress.label, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  4.verticalSpace,
+                  Text(selectedAddress.fullAddress, 
+                      style: TextStyle(fontSize: 13.sp, color: AppColors.textDark.withValues(alpha: 0.6))),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
