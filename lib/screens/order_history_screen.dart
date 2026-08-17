@@ -30,10 +30,12 @@ class OrderHistoryScreen extends StatelessWidget {
             .snapshots(),
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator(color: AppColors.maroon));
+            return const Center(
+                child: CircularProgressIndicator(color: AppColors.maroon));
           }
           final orders = snapshot.data!.docs
-              .map((d) => OrderModel.fromFirestore(d.id, d.data() as Map<String, dynamic>))
+              .map((d) => OrderModel.fromFirestore(
+                  d.id, d.data() as Map<String, dynamic>))
               .toList();
 
           if (orders.isEmpty) {
@@ -60,7 +62,8 @@ class OrderHistoryScreen extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.receipt_long_outlined, size: 80.r, color: AppColors.maroon.withValues(alpha: 0.1)),
+            Icon(Icons.receipt_long_outlined,
+                size: 80.r, color: AppColors.maroon.withValues(alpha: 0.1)),
             24.verticalSpace,
             Text(
               'No orders yet!',
@@ -70,7 +73,9 @@ class OrderHistoryScreen extends StatelessWidget {
             Text(
               'Your delicious meals will appear here once you place an order.',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 13.sp, color: AppColors.textDark.withValues(alpha: 0.5)),
+              style: TextStyle(
+                  fontSize: 13.sp,
+                  color: AppColors.textDark.withValues(alpha: 0.5)),
             ),
             32.verticalSpace,
             SizedBox(
@@ -92,6 +97,7 @@ class OrderHistoryScreen extends StatelessWidget {
 
 class _OrderHistoryCard extends StatefulWidget {
   final OrderModel order;
+
   const _OrderHistoryCard({required this.order});
 
   @override
@@ -108,26 +114,30 @@ class _OrderHistoryCardState extends State<_OrderHistoryCard> {
       case OrderStatus.cancelled:
         return AppColors.error;
       case OrderStatus.outForDelivery:
-        return AppColors.info;
+        return Colors.cyan;
       case OrderStatus.preparing:
         return AppColors.gold;
+      case OrderStatus.confirmed:
+        return AppColors.info;
+      case OrderStatus.placed:
       default:
-        return AppColors.maroon;
+        return Colors.blueGrey;
     }
   }
 
   Future<void> _handleRepeatOrder() async {
     setState(() => _reordering = true);
-    
+
     try {
       final cart = context.read<CartProvider>();
       final db = FirebaseFirestore.instance;
-      
+
       List<String> outOfStock = [];
       int addedCount = 0;
 
       // Filter out free items as they are added by addOffer logic
-      final itemsToProcess = widget.order.items.where((i) => i['is_free'] != true).toList();
+      final itemsToProcess =
+          widget.order.items.where((i) => i['is_free'] != true).toList();
 
       for (final itemData in itemsToProcess) {
         final itemId = itemData['item_id'] as String;
@@ -137,22 +147,28 @@ class _OrderHistoryCardState extends State<_OrderHistoryCard> {
         if (isOffer) {
           // Handle Offer
           String offerDocId = itemId;
-          if (itemId.startsWith('offer_')) offerDocId = itemId.replaceFirst('offer_', '');
+          if (itemId.startsWith('offer_'))
+            offerDocId = itemId.replaceFirst('offer_', '');
           if (itemId.startsWith('bogo_')) {
-             // For BOGO, itemId is bogo_{id}_buy
-             offerDocId = itemId.split('_')[1];
+            // For BOGO, itemId is bogo_{id}_buy
+            offerDocId = itemId.split('_')[1];
           }
 
           final offerDoc = await db.collection('offers').doc(offerDocId).get();
           if (offerDoc.exists) {
-            final offer = OfferModel.fromFirestore(offerDoc.id, offerDoc.data()!);
-            final expired = offer.expiryDate != null && offer.expiryDate!.isBefore(DateTime.now());
-            
+            final offer =
+                OfferModel.fromFirestore(offerDoc.id, offerDoc.data()!);
+            final expired = offer.expiryDate != null &&
+                offer.expiryDate!.isBefore(DateTime.now());
+
             if (offer.isActive && !expired) {
               if (offer.type == OfferType.bogo) {
                 final buyItem = await _fetchMenuItem(offer.buyItemId!);
                 final getItem = await _fetchMenuItem(offer.getItemId!);
-                if (buyItem != null && buyItem.available && getItem != null && getItem.available) {
+                if (buyItem != null &&
+                    buyItem.available &&
+                    getItem != null &&
+                    getItem.available) {
                   // Add BOGO set (the addOffer logic handles buyQty/getQty multipliers if we call it multiple times)
                   // But wait, the order stores the total qty. If buyQty is 1 and order has qty 2, it means user added it twice.
                   final sets = qty ~/ offer.buyQty;
@@ -195,13 +211,17 @@ class _OrderHistoryCardState extends State<_OrderHistoryCard> {
             context: context,
             builder: (ctx) => AlertDialog(
               title: const Text('Some items unavailable'),
-              content: Text('The following items were not added as they are currently out of stock or inactive:\n\n• ${outOfStock.join("\n• ")}'),
+              content: Text(
+                  'The following items were not added as they are currently out of stock or inactive:\n\n• ${outOfStock.join("\n• ")}'),
               actions: [
                 TextButton(
                   onPressed: () {
                     Navigator.pop(ctx);
                     if (addedCount > 0) {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const CartScreen()));
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const CartScreen()));
                     }
                   },
                   child: const Text('OK'),
@@ -210,12 +230,14 @@ class _OrderHistoryCardState extends State<_OrderHistoryCard> {
             ),
           );
         } else if (addedCount > 0) {
-          Navigator.push(context, MaterialPageRoute(builder: (_) => const CartScreen()));
+          Navigator.push(
+              context, MaterialPageRoute(builder: (_) => const CartScreen()));
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error repeating order: $e')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error repeating order: $e')));
       }
     } finally {
       if (mounted) setState(() => _reordering = false);
@@ -223,7 +245,8 @@ class _OrderHistoryCardState extends State<_OrderHistoryCard> {
   }
 
   Future<MenuItem?> _fetchMenuItem(String id) async {
-    final doc = await FirebaseFirestore.instance.collection('menu_items').doc(id).get();
+    final doc =
+        await FirebaseFirestore.instance.collection('menu_items').doc(id).get();
     if (!doc.exists) return null;
     return MenuItem.fromFirestore(doc.id, doc.data()!);
   }
@@ -239,7 +262,8 @@ class _OrderHistoryCardState extends State<_OrderHistoryCard> {
       child: InkWell(
         onTap: () => Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => OrderTrackingScreen(orderId: widget.order.id)),
+          MaterialPageRoute(
+              builder: (_) => OrderTrackingScreen(orderId: widget.order.id)),
         ),
         borderRadius: BorderRadius.circular(16.r),
         child: Padding(
@@ -256,28 +280,34 @@ class _OrderHistoryCardState extends State<_OrderHistoryCard> {
                     children: [
                       Text(
                         'Order #${widget.order.id.substring(0, 6).toUpperCase()}',
-                        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp),
+                        style: TextStyle(
+                            fontWeight: FontWeight.w700, fontSize: 14.sp),
                       ),
                       4.verticalSpace,
                       Text(
                         dateStr,
-                        style: TextStyle(fontSize: 11.sp, color: AppColors.textDark.withValues(alpha: 0.5)),
+                        style: TextStyle(
+                            fontSize: 11.sp,
+                            color: AppColors.textDark.withValues(alpha: 0.5)),
                       ),
                     ],
                   ),
                   Container(
-                    padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+                    padding:
+                        EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
                     decoration: BoxDecoration(
-                      color: _getStatusColor().withValues(alpha: 0.1),
+                      color: _getStatusColor().withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(8.r),
-                      border: Border.all(color: _getStatusColor().withValues(alpha: 0.2)),
+                      border: Border.all(
+                          color: _getStatusColor().withValues(alpha: 0.3)),
                     ),
                     child: Text(
                       orderStatusLabel(widget.order.orderStatus).toUpperCase(),
                       style: TextStyle(
                         fontSize: 10.sp,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w900,
                         color: _getStatusColor(),
+                        letterSpacing: 0.3,
                       ),
                     ),
                   ),
@@ -289,12 +319,19 @@ class _OrderHistoryCardState extends State<_OrderHistoryCard> {
               // Product Summary
               Text(
                 'ITEMS',
-                style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w600, letterSpacing: 0.5, color: AppColors.textDark.withValues(alpha: 0.4)),
+                style: TextStyle(
+                    fontSize: 10.sp,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.5,
+                    color: AppColors.textDark.withValues(alpha: 0.4)),
               ),
               8.verticalSpace,
               Text(
-                widget.order.items.map((i) => "${i['name']} x ${i['qty']}").join(", "),
-                style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w500, height: 1.4),
+                widget.order.items
+                    .map((i) => "${i['name']} x ${i['qty']}")
+                    .join(", "),
+                style: TextStyle(
+                    fontSize: 12.sp, fontWeight: FontWeight.w500, height: 1.4),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -308,41 +345,76 @@ class _OrderHistoryCardState extends State<_OrderHistoryCard> {
                     children: [
                       Text(
                         'Total Amount',
-                        style: TextStyle(fontSize: 10.sp, color: AppColors.textDark.withValues(alpha: 0.5)),
+                        style: TextStyle(
+                            fontSize: 10.sp,
+                            color: AppColors.textDark.withValues(alpha: 0.5)),
                       ),
                       Text(
                         '₹${widget.order.total.toStringAsFixed(0)}',
-                        style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w800, color: AppColors.maroon),
+                        style: TextStyle(
+                            fontSize: 16.sp,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.maroon),
                       ),
                     ],
                   ),
                   Row(
                     children: [
-                      if (widget.order.orderStatus == OrderStatus.delivered || widget.order.orderStatus == OrderStatus.cancelled)
+                      if (widget.order.orderStatus == OrderStatus.delivered ||
+                          widget.order.orderStatus == OrderStatus.cancelled)
                         TextButton(
                           onPressed: _reordering ? null : _handleRepeatOrder,
                           style: TextButton.styleFrom(
                             foregroundColor: AppColors.maroon,
                             padding: EdgeInsets.symmetric(horizontal: 12.w),
                           ),
-                          child: _reordering 
-                            ? SizedBox(width: 14.r, height: 14.r, child: const CircularProgressIndicator(strokeWidth: 2, color: AppColors.maroon))
-                            : Text('Repeat Order', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700)),
+                          child: _reordering
+                              ? SizedBox(
+                                  width: 14.r,
+                                  height: 14.r,
+                                  child: const CircularProgressIndicator(
+                                      strokeWidth: 2, color: AppColors.maroon))
+                              : Text('Repeat Order',
+                                  style: TextStyle(
+                                      fontSize: 12.sp,
+                                      fontWeight: FontWeight.w700)),
                         ),
                       8.horizontalSpace,
                       ElevatedButton(
                         onPressed: () => Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (_) => OrderTrackingScreen(orderId: widget.order.id)),
+                          MaterialPageRoute(
+                              builder: (_) => OrderTrackingScreen(
+                                  orderId: widget.order.id)),
                         ),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.maroon,
-                          foregroundColor: AppColors.gold,
-                          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+                          backgroundColor: widget.order.orderStatus ==
+                                      OrderStatus.delivered ||
+                                  widget.order.orderStatus ==
+                                      OrderStatus.cancelled
+                              ? AppColors.maroon
+                              : Colors.green,
+                          foregroundColor: widget.order.orderStatus ==
+                                      OrderStatus.delivered ||
+                                  widget.order.orderStatus ==
+                                      OrderStatus.cancelled
+                              ? AppColors.gold
+                              : AppColors.white,
+                          padding: EdgeInsets.symmetric(
+                              horizontal: 16.w, vertical: 8.h),
                           minimumSize: Size.zero,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16.r)),
                         ),
-                        child: Text('Details', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.bold)),
+                        child: Text(
+                          (widget.order.orderStatus == OrderStatus.delivered ||
+                                  widget.order.orderStatus ==
+                                      OrderStatus.cancelled)
+                              ? 'Details'
+                              : 'Track Now',
+                          style: TextStyle(
+                              fontSize: 12.sp, fontWeight: FontWeight.bold),
+                        ),
                       ),
                     ],
                   ),

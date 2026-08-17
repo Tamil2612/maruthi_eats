@@ -1,9 +1,3 @@
-# Tasks: Order Tracking UI & Bill Details Integration
-
-- `[x]` Update `OrderModel` to include `addressLabel`
-- `[x]` Redesign `OrderTrackingScreen` Header
-- `[x]` Add comprehensive "Bill Details" to `OrderTrackingScreen`
-- `[x]` Show used Coupon Code in Bill Details
-- `[x]` Improve Delivery Address section with Labels and Icons
-- `[x]` Add "Need Help?" section
-- `[x]` Verify UI consistency with Cart/Checkout
+- `[x]` Create `OrderSuccessScreen` with Lottie animation and 3s redirect
+- `[x]` Update `CheckoutScreen` to navigate to `OrderSuccessScreen`
+- `[x]` Verify the end-to-end checkout flow

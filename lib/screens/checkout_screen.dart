@@ -9,6 +9,7 @@ import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 import '../models/address_model.dart';
 import 'saved_addresses_screen.dart';
+import 'order_success_screen.dart';
 import 'order_tracking_screen.dart';
 
 enum PaymentChoice { upi, cod }
@@ -176,7 +177,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       if (!context.mounted) return;
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => OrderTrackingScreen(orderId: orderRef.id)),
+        MaterialPageRoute(builder: (_) => OrderSuccessScreen(orderId: orderRef.id)),
       );
     } catch (e) {
       if (!context.mounted) return;

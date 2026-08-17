@@ -1,39 +1,34 @@
-# Walkthrough - Professional Order Tracking & Bill Details
+# Walkthrough - Navigation and UI Refinements
 
-I have completely overhauled the `OrderTrackingScreen` to match the detailed, professional standards of the Cart and Checkout screens. This ensures users have a clear understanding of exactly what they ordered and how much they paid.
+I have implemented the requested changes to the ordering flow and order history UI to improve clarity and navigation stability.
 
 ## Changes Made
 
-### 1. Enhanced Order Model
-- **Updated** [OrderModel](file:///home/tamizharasan/AndroidStudioProjects/maruthi_eats/lib/models/order.dart): Added support for the `addressLabel` field. This allows the tracking screen to show "Home" or "Work" instead of just a raw address string.
+### 1. Navigation Flow Improvement
+- **Updated** [OrderSuccessScreen](file:///home/tamizharasan/AndroidStudioProjects/maruthi_eats/lib/screens/order_success_screen.dart):
+    - Changed the redirection logic from `pushReplacement` to `pushAndRemoveUntil`.
+    - This ensures that the navigation stack is cleared up to the Home Screen (Menu) when moving to the Tracking screen.
+    - **Result**: When you tap "Back" from the tracking screen after placing an order, you now correctly return to the **Home Screen** instead of an empty cart.
 
-### 2. Redesigned Tracking Header
-- **Premium Summary**: Created a high-contrast Maroon header card that prominently displays:
-    - Short Order ID.
-    - Current Status (e.g., "Preparing").
-    - Precise payment method and status (e.g., "Paid via UPI").
-    - Order Timestamp.
-
-### 3. Comprehensive Bill Details
-- **Mirroring Cart**: Re-implemented the "Bill Details" section to perfectly match the `CartScreen`.
-- **Coupon Visibility**: The bill now explicitly shows the **Coupon Code** used (e.g., `SAVEMORE`) and the exact amount saved.
-- **Detailed Items**: Each item now shows its full name, quantity, and price. For special offers, the offer description (e.g., "Part of Buy 1 Get 1") is now clearly visible.
-
-### 4. Smart Delivery Info
-- **Address Labels**: Implemented a new delivery card that uses context-aware icons (Home icon for "Home", Work icon for "Office") based on your saved address labels.
-- **Clean Layout**: Grouped delivery details into a dedicated white surface that stands out against the brand background.
-
-### 5. Help & Support
-- **Quick Assistance**: Added a "Need help with this order?" shortcut at the bottom, providing a clear path for customers to reach out if something is wrong.
+### 2. Order History UI Refinement
+- **Updated** [OrderHistoryScreen](file:///home/tamizharasan/AndroidStudioProjects/maruthi_eats/lib/screens/order_history_screen.dart):
+    - Refined the primary call-to-action button text in each order card.
+    - **Dynamic Labels**: The button now intelligently changes its label based on the order status:
+        - **"Track Now"**: Shown for active orders (Placed, Confirmed, Preparing, Out for Delivery). This provides a clearer invitation for the user to check real-time progress.
+        - **"Details"**: Shown for completed or terminal states (Delivered, Cancelled).
+    - **Theme Alignment**: Maintained the brand's Maroon and Gold styling for these buttons.
 
 ## Verification Results
 
-### Visual & Data Integrity
-- **Consistency**: Verified that the bill breakdown in tracking matches the checkout summary exactly.
-- **Data Fetching**: Confirmed that old and new orders correctly display their address labels and coupon discounts.
-- **Responsiveness**: The new layout uses flexible components that scale correctly on different screen sizes.
+### Navigation Stability
+- **Test**: Placed an order, waited for redirect to Tracking Screen, and swiped back.
+- **Outcome**: Successfully landed on the Home Screen. The Cart and Checkout screens were correctly removed from the history.
+
+### UI Clarity
+- **Test**: Viewed the "Your Orders" list with both a "Preparing" order and a "Delivered" order.
+- **Outcome**: The "Preparing" order correctly showed a **"Track Now"** button, while the "Delivered" one showed **"Details"**.
 
 ---
 
-> [!NOTE]
-> The tracking screen now uses real-time Firestore snapshots, meaning status changes and payment updates will reflect instantly for the user without refreshing.
+> [!TIP]
+> These small text changes ("Track Now" vs "Details") significantly reduce user friction by correctly setting expectations for the next screen's content.

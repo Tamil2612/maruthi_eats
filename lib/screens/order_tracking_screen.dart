@@ -4,10 +4,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import '../models/order.dart';
 import '../theme/app_theme.dart';
+import '../widgets/order_status_animation.dart';
 import '../widgets/order_status_stepper.dart';
 
 class OrderTrackingScreen extends StatelessWidget {
   final String orderId;
+
   const OrderTrackingScreen({super.key, required this.orderId});
 
   @override
@@ -19,13 +21,17 @@ class OrderTrackingScreen extends StatelessWidget {
         centerTitle: false,
       ),
       body: StreamBuilder<DocumentSnapshot>(
-        stream: FirebaseFirestore.instance.collection('orders').doc(orderId).snapshots(),
+        stream: FirebaseFirestore.instance
+            .collection('orders')
+            .doc(orderId)
+            .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
             return const Center(child: Text('Error loading order tracking'));
           }
           if (!snapshot.hasData || !snapshot.data!.exists) {
-            return const Center(child: CircularProgressIndicator(color: AppColors.maroon));
+            return const Center(
+                child: CircularProgressIndicator(color: AppColors.maroon));
           }
 
           final order = OrderModel.fromFirestore(
@@ -54,6 +60,7 @@ class OrderTrackingScreen extends StatelessWidget {
 
 class _ActiveTrackingView extends StatelessWidget {
   final OrderModel order;
+
   const _ActiveTrackingView({required this.order});
 
   @override
@@ -71,14 +78,16 @@ class _ActiveTrackingView extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Icon(Icons.local_shipping_outlined, size: 16.r, color: AppColors.maroon),
+                    Icon(Icons.local_shipping_outlined,
+                        size: 16.r, color: AppColors.maroon),
                     8.horizontalSpace,
                     Text('Order Progress',
-                        style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.sp)),
+                        style: TextStyle(
+                            fontWeight: FontWeight.w800, fontSize: 14.sp)),
                   ],
                 ),
                 16.verticalSpace,
-                OrderStatusStepper(currentStatus: order.orderStatus),
+                OrderStatusAnimation(status: order.orderStatus,tint: false,),
               ],
             ),
           ),
@@ -89,16 +98,19 @@ class _ActiveTrackingView extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Icon(Icons.receipt_long_outlined, size: 16.r, color: AppColors.maroon),
+                    Icon(Icons.receipt_long_outlined,
+                        size: 16.r, color: AppColors.maroon),
                     8.horizontalSpace,
                     Text('Items Ordered',
-                        style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.sp)),
+                        style: TextStyle(
+                            fontWeight: FontWeight.w800, fontSize: 14.sp)),
                   ],
                 ),
                 12.verticalSpace,
                 ...order.items.map((item) => _OrderedItemRow(item: item)),
                 16.verticalSpace,
-                Divider(color: AppColors.grey.withValues(alpha: 0.2), height: 1),
+                Divider(
+                    color: AppColors.grey.withValues(alpha: 0.2), height: 1),
                 16.verticalSpace,
                 _TrackingBillDetails(order: order),
               ],
@@ -117,6 +129,7 @@ class _ActiveTrackingView extends StatelessWidget {
 
 class _SectionCard extends StatelessWidget {
   final Widget child;
+
   const _SectionCard({required this.child});
 
   @override
@@ -143,6 +156,7 @@ class _SectionCard extends StatelessWidget {
 
 class _OrderSummaryHeader extends StatelessWidget {
   final OrderModel order;
+
   const _OrderSummaryHeader({required this.order});
 
   @override
@@ -162,7 +176,10 @@ class _OrderSummaryHeader extends StatelessWidget {
         ),
         borderRadius: BorderRadius.circular(20.r),
         boxShadow: [
-          BoxShadow(color: AppColors.maroon.withValues(alpha: 0.25), blurRadius: 18, offset: const Offset(0, 8)),
+          BoxShadow(
+              color: AppColors.maroon.withValues(alpha: 0.25),
+              blurRadius: 18,
+              offset: const Offset(0, 8)),
         ],
       ),
       child: Column(
@@ -176,22 +193,34 @@ class _OrderSummaryHeader extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: AppColors.gold.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(20.r),
-                  border: Border.all(color: AppColors.gold.withValues(alpha: 0.4)),
+                  border:
+                      Border.all(color: AppColors.gold.withValues(alpha: 0.4)),
                 ),
                 child: Text('#${order.id.substring(0, 6).toUpperCase()}',
-                    style: TextStyle(color: AppColors.gold, fontWeight: FontWeight.w700, fontSize: 12.sp, letterSpacing: 0.5)),
+                    style: TextStyle(
+                        color: AppColors.gold,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12.sp,
+                        letterSpacing: 0.5)),
               ),
               Text(dateStr,
-                  style: TextStyle(color: AppColors.white.withValues(alpha: 0.55), fontSize: 11.sp)),
+                  style: TextStyle(
+                      color: AppColors.white.withValues(alpha: 0.55),
+                      fontSize: 11.sp)),
             ],
           ),
           16.verticalSpace,
           Text(orderStatusLabel(order.orderStatus),
-              style: TextStyle(color: AppColors.white, fontSize: 23.sp, fontWeight: FontWeight.w900)),
+              style: TextStyle(
+                  color: AppColors.white,
+                  fontSize: 23.sp,
+                  fontWeight: FontWeight.w900)),
           6.verticalSpace,
           Text(
             _statusSubtext(order.orderStatus),
-            style: TextStyle(color: AppColors.white.withValues(alpha: 0.65), fontSize: 12.5.sp),
+            style: TextStyle(
+                color: AppColors.white.withValues(alpha: 0.65),
+                fontSize: 12.5.sp),
           ),
           14.verticalSpace,
           Container(
@@ -203,7 +232,9 @@ class _OrderSummaryHeader extends StatelessWidget {
             child: Row(
               children: [
                 Icon(
-                  order.paymentMode == 'upi' ? Icons.verified_user : Icons.payments_outlined,
+                  order.paymentMode == 'upi'
+                      ? Icons.verified_user
+                      : Icons.payments_outlined,
                   color: AppColors.gold,
                   size: 14.r,
                 ),
@@ -213,7 +244,10 @@ class _OrderSummaryHeader extends StatelessWidget {
                     order.paymentMode == 'upi'
                         ? 'Paid via UPI · ${order.paymentStatus}'
                         : 'Cash on Delivery · ${order.paymentStatus == 'cod_collected' ? 'Collected' : 'Pay on arrival'}',
-                    style: TextStyle(color: AppColors.white.withValues(alpha: 0.85), fontSize: 12.sp, fontWeight: FontWeight.w500),
+                    style: TextStyle(
+                        color: AppColors.white.withValues(alpha: 0.85),
+                        fontSize: 12.sp,
+                        fontWeight: FontWeight.w500),
                   ),
                 ),
               ],
@@ -242,6 +276,7 @@ class _OrderSummaryHeader extends StatelessWidget {
 
 class _OrderedItemRow extends StatelessWidget {
   final Map<String, dynamic> item;
+
   const _OrderedItemRow({required this.item});
 
   @override
@@ -258,7 +293,9 @@ class _OrderedItemRow extends StatelessWidget {
             height: 8.r,
             margin: EdgeInsets.only(top: 5.h),
             decoration: BoxDecoration(
-              color: isFree ? AppColors.success : AppColors.maroon.withValues(alpha: 0.25),
+              color: isFree
+                  ? AppColors.success
+                  : AppColors.maroon.withValues(alpha: 0.25),
               shape: BoxShape.circle,
             ),
           ),
@@ -269,22 +306,31 @@ class _OrderedItemRow extends StatelessWidget {
               children: [
                 Text(
                   '${item['name']} × ${item['qty']}',
-                  style: TextStyle(fontSize: 13.5.sp, fontWeight: FontWeight.w600, color: AppColors.textDark),
+                  style: TextStyle(
+                      fontSize: 13.5.sp,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textDark),
                 ),
                 if (item['offer_description'] != null)
                   Text(
                     item['offer_description'],
-                    style: TextStyle(fontSize: 10.sp, color: AppColors.textDark.withValues(alpha: 0.4)),
+                    style: TextStyle(
+                        fontSize: 10.sp,
+                        color: AppColors.textDark.withValues(alpha: 0.4)),
                   ),
               ],
             ),
           ),
           Text(
-            isFree ? 'FREE' : '₹${(item['price'] * item['qty']).toStringAsFixed(0)}',
+            isFree
+                ? 'FREE'
+                : '₹${(item['price'] * item['qty']).toStringAsFixed(0)}',
             style: TextStyle(
               fontSize: 13.sp,
               fontWeight: FontWeight.bold,
-              color: isFree ? AppColors.success : AppColors.textDark.withValues(alpha: 0.8),
+              color: isFree
+                  ? AppColors.success
+                  : AppColors.textDark.withValues(alpha: 0.8),
             ),
           ),
         ],
@@ -295,6 +341,7 @@ class _OrderedItemRow extends StatelessWidget {
 
 class _TrackingBillDetails extends StatelessWidget {
   final OrderModel order;
+
   const _TrackingBillDetails({required this.order});
 
   @override
@@ -304,16 +351,22 @@ class _TrackingBillDetails extends StatelessWidget {
       children: [
         _billRow('Item Total', order.itemTotal),
         if (order.couponDiscount > 0)
-          _billRow('Coupon (${order.couponCode ?? "Applied"})', -order.couponDiscount, isDiscount: true),
+          _billRow('Coupon (${order.couponCode ?? "Applied"})',
+              -order.couponDiscount,
+              isDiscount: true),
         _billRow('Delivery Fee', order.deliveryFee),
         if (order.taxes > 0) _billRow('Taxes & Charges', order.taxes),
         14.verticalSpace,
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('Paid / Payable', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w900)),
+            Text('Paid / Payable',
+                style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w900)),
             Text('₹${order.total.toStringAsFixed(0)}',
-                style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w900, color: AppColors.maroon)),
+                style: TextStyle(
+                    fontSize: 15.sp,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.maroon)),
           ],
         ),
       ],
@@ -330,7 +383,9 @@ class _TrackingBillDetails extends StatelessWidget {
             label,
             style: TextStyle(
               fontSize: 12.5.sp,
-              color: isDiscount ? AppColors.success : AppColors.textDark.withValues(alpha: 0.5),
+              color: isDiscount
+                  ? AppColors.success
+                  : AppColors.textDark.withValues(alpha: 0.5),
               fontWeight: isDiscount ? FontWeight.w700 : FontWeight.w500,
             ),
           ),
@@ -338,7 +393,9 @@ class _TrackingBillDetails extends StatelessWidget {
             '${amount < 0 ? "-" : ""}₹${amount.abs().toStringAsFixed(0)}',
             style: TextStyle(
               fontSize: 12.5.sp,
-              color: isDiscount ? AppColors.success : AppColors.textDark.withValues(alpha: 0.8),
+              color: isDiscount
+                  ? AppColors.success
+                  : AppColors.textDark.withValues(alpha: 0.8),
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -350,6 +407,7 @@ class _TrackingBillDetails extends StatelessWidget {
 
 class _DeliveryInfoCard extends StatelessWidget {
   final OrderModel order;
+
   const _DeliveryInfoCard({required this.order});
 
   @override
@@ -376,7 +434,10 @@ class _DeliveryInfoCard extends StatelessWidget {
           12.verticalSpace,
           Text(
             order.deliveryAddress,
-            style: TextStyle(color: AppColors.textDark.withValues(alpha: 0.6), fontSize: 12.sp, height: 1.4),
+            style: TextStyle(
+                color: AppColors.textDark.withValues(alpha: 0.6),
+                fontSize: 12.sp,
+                height: 1.4),
           ),
         ],
       ),
@@ -395,11 +456,15 @@ class _HelpSection extends StatelessWidget {
         onPressed: () {},
         icon: Icon(Icons.help_outline, size: 18.r, color: AppColors.maroon),
         label: Text('Need help with this order?',
-            style: TextStyle(color: AppColors.maroon, fontWeight: FontWeight.bold, fontSize: 13.sp)),
+            style: TextStyle(
+                color: AppColors.maroon,
+                fontWeight: FontWeight.bold,
+                fontSize: 13.sp)),
         style: TextButton.styleFrom(
           padding: EdgeInsets.symmetric(vertical: 12.h, horizontal: 16.w),
           backgroundColor: AppColors.maroon.withValues(alpha: 0.05),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
         ),
       ),
     );
@@ -412,6 +477,7 @@ class _HelpSection extends StatelessWidget {
 
 class _CancelledOrderView extends StatelessWidget {
   final OrderModel order;
+
   const _CancelledOrderView({required this.order});
 
   @override
@@ -427,14 +493,21 @@ class _CancelledOrderView extends StatelessWidget {
               color: AppColors.error.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
-            child: Icon(Icons.close_rounded, color: AppColors.error, size: 44.r),
+            child:
+                Icon(Icons.close_rounded, color: AppColors.error, size: 44.r),
           ),
           20.verticalSpace,
-          Text('Order Cancelled', style: TextStyle(fontSize: 20.sp, fontWeight: FontWeight.w800, color: AppColors.textDark)),
+          Text('Order Cancelled',
+              style: TextStyle(
+                  fontSize: 20.sp,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textDark)),
           8.verticalSpace,
           Text(
             'Order #${order.id.substring(0, 6).toUpperCase()} was cancelled.',
-            style: TextStyle(color: AppColors.textDark.withValues(alpha: 0.55), fontSize: 13.sp),
+            style: TextStyle(
+                color: AppColors.textDark.withValues(alpha: 0.55),
+                fontSize: 13.sp),
           ),
           28.verticalSpace,
           _SectionCard(
@@ -443,7 +516,8 @@ class _CancelledOrderView extends StatelessWidget {
               children: [
                 ...order.items.map((item) => _OrderedItemRow(item: item)),
                 14.verticalSpace,
-                Divider(color: AppColors.grey.withValues(alpha: 0.2), height: 1),
+                Divider(
+                    color: AppColors.grey.withValues(alpha: 0.2), height: 1),
                 14.verticalSpace,
                 _TrackingBillDetails(order: order),
               ],
@@ -469,6 +543,7 @@ class _CancelledOrderView extends StatelessWidget {
 
 class _DeliveredOrderView extends StatefulWidget {
   final OrderModel order;
+
   const _DeliveredOrderView({required this.order});
 
   @override
@@ -497,22 +572,34 @@ class _DeliveredOrderViewState extends State<_DeliveredOrderView> {
             height: 96.r,
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [AppColors.success, AppColors.success.withValues(alpha: 0.7)],
+                colors: [
+                  AppColors.success,
+                  AppColors.success.withValues(alpha: 0.7)
+                ],
               ),
               shape: BoxShape.circle,
               boxShadow: [
-                BoxShadow(color: AppColors.success.withValues(alpha: 0.3), blurRadius: 24, offset: const Offset(0, 10)),
+                BoxShadow(
+                    color: AppColors.success.withValues(alpha: 0.3),
+                    blurRadius: 24,
+                    offset: const Offset(0, 10)),
               ],
             ),
-            child: Icon(Icons.check_rounded, color: AppColors.white, size: 52.r),
+            child:
+                Icon(Icons.check_rounded, color: AppColors.white, size: 52.r),
           ),
           20.verticalSpace,
           Text('Delivered!',
-              style: TextStyle(fontSize: 24.sp, fontWeight: FontWeight.w900, color: AppColors.textDark)),
+              style: TextStyle(
+                  fontSize: 24.sp,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.textDark)),
           6.verticalSpace,
           Text(
             'Order #${order.id.substring(0, 6).toUpperCase()} · $dateStr',
-            style: TextStyle(color: AppColors.textDark.withValues(alpha: 0.5), fontSize: 12.5.sp),
+            style: TextStyle(
+                color: AppColors.textDark.withValues(alpha: 0.5),
+                fontSize: 12.5.sp),
           ),
           28.verticalSpace,
 
@@ -524,14 +611,22 @@ class _DeliveredOrderViewState extends State<_DeliveredOrderView> {
               color: AppColors.maroon,
               borderRadius: BorderRadius.circular(20.r),
               boxShadow: [
-                BoxShadow(color: AppColors.maroon.withValues(alpha: 0.25), blurRadius: 16, offset: const Offset(0, 8)),
+                BoxShadow(
+                    color: AppColors.maroon.withValues(alpha: 0.25),
+                    blurRadius: 16,
+                    offset: const Offset(0, 8)),
               ],
             ),
             child: Column(
               children: [
                 Text(
-                  _ratingSubmitted ? 'Thanks for the feedback!' : 'How was your food?',
-                  style: TextStyle(color: AppColors.white, fontWeight: FontWeight.w700, fontSize: 15.sp),
+                  _ratingSubmitted
+                      ? 'Thanks for the feedback!'
+                      : 'How was your food?',
+                  style: TextStyle(
+                      color: AppColors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15.sp),
                 ),
                 14.verticalSpace,
                 Row(
@@ -555,13 +650,16 @@ class _DeliveredOrderViewState extends State<_DeliveredOrderView> {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: _submittingRating ? null : () => _submitRating(order.id),
+                      onPressed: _submittingRating
+                          ? null
+                          : () => _submitRating(order.id),
                       child: _submittingRating
                           ? SizedBox(
-                        height: 18.r,
-                        width: 18.r,
-                        child: const CircularProgressIndicator(strokeWidth: 2, color: AppColors.textDark),
-                      )
+                              height: 18.r,
+                              width: 18.r,
+                              child: const CircularProgressIndicator(
+                                  strokeWidth: 2, color: AppColors.textDark),
+                            )
                           : const Text('Submit Rating'),
                     ),
                   ),
@@ -578,15 +676,19 @@ class _DeliveredOrderViewState extends State<_DeliveredOrderView> {
               children: [
                 Row(
                   children: [
-                    Icon(Icons.receipt_long_outlined, size: 16.r, color: AppColors.maroon),
+                    Icon(Icons.receipt_long_outlined,
+                        size: 16.r, color: AppColors.maroon),
                     8.horizontalSpace,
-                    Text('Order Summary', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.sp)),
+                    Text('Order Summary',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w800, fontSize: 14.sp)),
                   ],
                 ),
                 12.verticalSpace,
                 ...order.items.map((item) => _OrderedItemRow(item: item)),
                 14.verticalSpace,
-                Divider(color: AppColors.grey.withValues(alpha: 0.2), height: 1),
+                Divider(
+                    color: AppColors.grey.withValues(alpha: 0.2), height: 1),
                 14.verticalSpace,
                 _TrackingBillDetails(order: order),
               ],
@@ -620,7 +722,10 @@ class _DeliveredOrderViewState extends State<_DeliveredOrderView> {
   Future<void> _submitRating(String orderId) async {
     setState(() => _submittingRating = true);
     try {
-      await FirebaseFirestore.instance.collection('orders').doc(orderId).update({
+      await FirebaseFirestore.instance
+          .collection('orders')
+          .doc(orderId)
+          .update({
         'rating': _rating,
       });
       if (mounted) setState(() => _ratingSubmitted = true);
@@ -628,7 +733,8 @@ class _DeliveredOrderViewState extends State<_DeliveredOrderView> {
       if (mounted) {
         setState(() => _submittingRating = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not submit rating. Please try again.')),
+          const SnackBar(
+              content: Text('Could not submit rating. Please try again.')),
         );
       }
     }

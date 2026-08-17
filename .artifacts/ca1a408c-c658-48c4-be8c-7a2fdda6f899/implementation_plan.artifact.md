@@ -1,34 +1,28 @@
-# Professional Order Tracking UI & Bill Details Integration
+# Order Success Screen Implementation
 
-This plan focuses on making the `OrderTrackingScreen` as informative and professional as the `Cart` and `Checkout` screens. It ensures all saved details (coupons, address labels, price breakdowns) are clearly visible to the user.
+This plan introduces a dedicated "Order Success" screen that appears immediately after a successful checkout. It provides visual confirmation using animations and automatically redirects the user to the order tracking page.
 
 ## Proposed Changes
 
-### [Models]
+### [New Screen]
 
-#### [MODIFY] [order.dart](file:///home/tamizharasan/AndroidStudioProjects/maruthi_eats/lib/models/order.dart)
-- Update `OrderModel` to include the `addressLabel` field.
-- Update `fromFirestore` to map the `address_label` from the database.
+#### [NEW] [order_success_screen.dart](file:///home/tamizharasan/AndroidStudioProjects/maruthi_eats/lib/screens/order_success_screen.dart)
+- Create a stateless or stateful widget that:
+    - Takes `orderId` as a required parameter.
+    - Displays a "Congratulations!" or "Order Placed Successfully" message.
+    - Shows a Lottie animation (`assets/animations/order_confirmed.json`) for visual confirmation.
+    - Uses a 3-second delay (via `Future.delayed` in `initState`) to automatically navigate to `OrderTrackingScreen`.
+    - Includes a "Track My Order" button for users who don't want to wait.
 
-### [Screens]
+### [Checkout Integration]
 
-#### [MODIFY] [order_tracking_screen.dart](file:///home/tamizharasan/AndroidStudioProjects/maruthi_eats/lib/screens/order_tracking_screen.dart)
-- **Enhanced Header**: Add a more detailed header showing order timestamp and a cleaner ID presentation.
-- **Bill Details Integration**:
-    - Re-implement the "Bill Details" section to mirror the `CartScreen` style.
-    - Explicitly show the **Coupon Code** used (e.g., "SAVEMORE applied").
-    - Include Taxes if they are stored in the order.
-- **Delivery Address Card**:
-    - Add a specialized card for delivery details.
-    - Show the `addressLabel` (e.g., "Home", "Work") prominently with its icon.
-- **"Need Help?" Section**:
-    - Add a footer section with quick actions for contacting support or viewing policies.
-- **UI Polish**: Use professional card grouping, consistent margins, and better typography.
+#### [MODIFY] [checkout_screen.dart](file:///home/tamizharasan/AndroidStudioProjects/maruthi_eats/lib/screens/checkout_screen.dart)
+- Update the `_placeOrder` method to navigate to `OrderSuccessScreen` instead of `OrderTrackingScreen` upon successful Firestore order creation.
 
 ## Verification Plan
 
 ### Manual Verification
-1.  **Placement to Tracking**: Place an order with a coupon. Verify the tracking screen shows the correct coupon code and discount amount.
-2.  **Address Context**: Verify that the address section shows the correct label (e.g., "Home") instead of just the raw address string.
-3.  **Bill Consistency**: Compare the "Bill Details" in the Tracking screen with the "Bill Details" in the Cart. They should look identical in terms of structure and styling.
-4.  **Empty State / Loading**: Ensure the shimmer or loading indicator looks smooth on slower connections.
+1.  **Placement Flow**: Place a test order (using COD). Verify that the app transitions to a beautiful Success screen.
+2.  **Auto-Redirection**: Wait on the Success screen without interaction. Verify that after 3 seconds, it automatically navigates to the Tracking screen.
+3.  **Manual Override**: Tap the "Track My Order" button immediately. Verify it skips the wait and goes to the Tracking screen correctly.
+4.  **UI Review**: Ensure the Lottie animation plays correctly and the brand colors (Maroon/Gold) are respected.

@@ -35,24 +35,36 @@ class AppTheme {
         surface: AppColors.white,
         error: AppColors.error,
       ),
-      textTheme: baseTextTheme.copyWith(
-        displayLarge: baseTextTheme.displayLarge?.copyWith(fontSize: 32.sp, fontWeight: FontWeight.bold),
-        displayMedium: baseTextTheme.displayMedium?.copyWith(fontSize: 28.sp, fontWeight: FontWeight.bold),
-        displaySmall: baseTextTheme.displaySmall?.copyWith(fontSize: 24.sp, fontWeight: FontWeight.bold),
-        headlineLarge: baseTextTheme.headlineLarge?.copyWith(fontSize: 20.sp, fontWeight: FontWeight.bold),
-        headlineMedium: baseTextTheme.headlineMedium?.copyWith(fontSize: 18.sp, fontWeight: FontWeight.bold),
-        headlineSmall: baseTextTheme.headlineSmall?.copyWith(fontSize: 16.sp, fontWeight: FontWeight.bold),
-        titleLarge: baseTextTheme.titleLarge?.copyWith(fontSize: 16.sp, fontWeight: FontWeight.w600),
-        titleMedium: baseTextTheme.titleMedium?.copyWith(fontSize: 14.sp, fontWeight: FontWeight.w600),
-        titleSmall: baseTextTheme.titleSmall?.copyWith(fontSize: 12.sp, fontWeight: FontWeight.w600),
-        bodyLarge: baseTextTheme.bodyLarge?.copyWith(fontSize: 14.sp),
-        bodyMedium: baseTextTheme.bodyMedium?.copyWith(fontSize: 12.sp),
-        bodySmall: baseTextTheme.bodySmall?.copyWith(fontSize: 11.sp),
-        labelLarge: baseTextTheme.labelLarge?.copyWith(fontSize: 12.sp, fontWeight: FontWeight.w600),
-      ).apply(
-        bodyColor: AppColors.textDark,
-        displayColor: AppColors.textDark,
-      ),
+      textTheme: baseTextTheme
+          .copyWith(
+            displayLarge: baseTextTheme.displayLarge
+                ?.copyWith(fontSize: 32.sp, fontWeight: FontWeight.bold),
+            displayMedium: baseTextTheme.displayMedium
+                ?.copyWith(fontSize: 28.sp, fontWeight: FontWeight.bold),
+            displaySmall: baseTextTheme.displaySmall
+                ?.copyWith(fontSize: 24.sp, fontWeight: FontWeight.bold),
+            headlineLarge: baseTextTheme.headlineLarge
+                ?.copyWith(fontSize: 20.sp, fontWeight: FontWeight.bold),
+            headlineMedium: baseTextTheme.headlineMedium
+                ?.copyWith(fontSize: 18.sp, fontWeight: FontWeight.bold),
+            headlineSmall: baseTextTheme.headlineSmall
+                ?.copyWith(fontSize: 16.sp, fontWeight: FontWeight.bold),
+            titleLarge: baseTextTheme.titleLarge
+                ?.copyWith(fontSize: 16.sp, fontWeight: FontWeight.w600),
+            titleMedium: baseTextTheme.titleMedium
+                ?.copyWith(fontSize: 14.sp, fontWeight: FontWeight.w600),
+            titleSmall: baseTextTheme.titleSmall
+                ?.copyWith(fontSize: 12.sp, fontWeight: FontWeight.w600),
+            bodyLarge: baseTextTheme.bodyLarge?.copyWith(fontSize: 14.sp),
+            bodyMedium: baseTextTheme.bodyMedium?.copyWith(fontSize: 12.sp),
+            bodySmall: baseTextTheme.bodySmall?.copyWith(fontSize: 11.sp),
+            labelLarge: baseTextTheme.labelLarge
+                ?.copyWith(fontSize: 12.sp, fontWeight: FontWeight.w600),
+          )
+          .apply(
+            bodyColor: AppColors.textDark,
+            displayColor: AppColors.textDark,
+          ),
 
       // App bar: Maroon background, gold/white text
       appBarTheme: AppBarTheme(
@@ -125,7 +137,8 @@ class AppTheme {
           fontSize: 12.sp,
         ),
         side: BorderSide(color: AppColors.maroon.withValues(alpha: 0.1)),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
         padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
       ),
 
@@ -141,7 +154,8 @@ class AppTheme {
         type: BottomNavigationBarType.fixed,
         showUnselectedLabels: true,
         elevation: 8,
-        selectedLabelStyle: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w600),
+        selectedLabelStyle:
+            TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w600),
         unselectedLabelStyle: TextStyle(fontSize: 10.sp),
       ),
 
@@ -150,11 +164,13 @@ class AppTheme {
         fillColor: AppColors.white,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10.r),
-          borderSide: BorderSide(color: AppColors.maroon.withValues(alpha: 0.2)),
+          borderSide:
+              BorderSide(color: AppColors.maroon.withValues(alpha: 0.2)),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10.r),
-          borderSide: BorderSide(color: AppColors.maroon.withValues(alpha: 0.2)),
+          borderSide:
+              BorderSide(color: AppColors.maroon.withValues(alpha: 0.2)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10.r),
