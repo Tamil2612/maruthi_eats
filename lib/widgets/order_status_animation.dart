@@ -39,8 +39,6 @@ class OrderStatusAnimation extends StatelessWidget {
     switch (status) {
       case OrderStatus.placed:
         return 'assets/animations/order_placed.json';
-      case OrderStatus.confirmed:
-        return 'assets/animations/order_confirmed.json';
       case OrderStatus.preparing:
         return 'assets/animations/cooking.json';
       case OrderStatus.outForDelivery:
@@ -56,8 +54,6 @@ class OrderStatusAnimation extends StatelessWidget {
     switch (status) {
       case OrderStatus.placed:
         return 'Waiting for order confirmation...';
-      case OrderStatus.confirmed:
-        return 'Your order has been confirmed! \nPreparing soon.....';
       case OrderStatus.preparing:
         return 'Your food is being prepared with care';
       case OrderStatus.outForDelivery:
@@ -73,8 +69,6 @@ class OrderStatusAnimation extends StatelessWidget {
     switch (status) {
       case OrderStatus.placed:
         return Icons.receipt_long_rounded;
-      case OrderStatus.confirmed:
-        return Icons.storefront_rounded;
       case OrderStatus.preparing:
         return Icons.soup_kitchen_rounded;
       case OrderStatus.outForDelivery:

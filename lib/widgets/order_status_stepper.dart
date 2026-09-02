@@ -10,7 +10,6 @@ class OrderStatusStepper extends StatelessWidget {
 
   static const _steps = [
     OrderStatus.placed,
-    OrderStatus.confirmed,
     OrderStatus.preparing,
     OrderStatus.outForDelivery,
     OrderStatus.delivered,
@@ -18,7 +17,6 @@ class OrderStatusStepper extends StatelessWidget {
 
   static const _icons = [
     Icons.receipt_long,
-    Icons.check_circle_outline,
     Icons.soup_kitchen,
     Icons.delivery_dining,
     Icons.home,

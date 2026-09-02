@@ -157,5 +157,24 @@ class AuthService {
         .delete();
   }
 
+  Future<void> deleteAccount() async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    final uid = user.uid;
+
+    // 1. Delete addresses subcollection
+    final addresses = await _db.collection('users').doc(uid).collection('addresses').get();
+    for (var doc in addresses.docs) {
+      await doc.reference.delete();
+    }
+
+    // 2. Delete user document
+    await _db.collection('users').doc(uid).delete();
+
+    // 3. Delete auth account
+    await user.delete();
+  }
+
   Future<void> signOut() => _auth.signOut();
 }

@@ -1,14 +1,13 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-enum OrderStatus { placed, confirmed, preparing, outForDelivery, delivered, cancelled }
+enum OrderStatus { placed, preparing, outForDelivery, delivered, cancelled }
 
 enum PaymentMode { upi, cod }
 
 OrderStatus orderStatusFromString(String status) {
   switch (status) {
-    case 'confirmed':
-      return OrderStatus.confirmed;
     case 'preparing':
+    case 'confirmed': // Map legacy 'confirmed' to 'preparing'
       return OrderStatus.preparing;
     case 'out_for_delivery':
       return OrderStatus.outForDelivery;
@@ -26,8 +25,6 @@ String orderStatusLabel(OrderStatus status) {
   switch (status) {
     case OrderStatus.placed:
       return 'Order Placed';
-    case OrderStatus.confirmed:
-      return 'Confirmed';
     case OrderStatus.preparing:
       return 'Preparing';
     case OrderStatus.outForDelivery:

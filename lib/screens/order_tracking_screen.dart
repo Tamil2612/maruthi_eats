@@ -261,9 +261,7 @@ class _OrderSummaryHeader extends StatelessWidget {
   String _statusSubtext(OrderStatus status) {
     switch (status) {
       case OrderStatus.placed:
-        return "We've received your order — the kitchen will confirm shortly.";
-      case OrderStatus.confirmed:
-        return 'Your order is confirmed and will start preparing soon.';
+        return "We've received your order — the kitchen will start preparing it shortly.";
       case OrderStatus.preparing:
         return 'The kitchen is preparing your food fresh.';
       case OrderStatus.outForDelivery:

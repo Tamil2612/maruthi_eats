@@ -117,8 +117,6 @@ class _OrderHistoryCardState extends State<_OrderHistoryCard> {
         return Colors.cyan;
       case OrderStatus.preparing:
         return AppColors.gold;
-      case OrderStatus.confirmed:
-        return AppColors.info;
       case OrderStatus.placed:
       default:
         return Colors.blueGrey;

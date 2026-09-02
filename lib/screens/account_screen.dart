@@ -5,6 +5,8 @@ import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 import 'edit_profile_screen.dart';
 import 'saved_addresses_screen.dart';
+import 'privacy_policy_screen.dart';
+import 'terms_conditions_screen.dart';
 
 class AccountScreen extends StatelessWidget {
   const AccountScreen({super.key});
@@ -71,6 +73,27 @@ class AccountScreen extends StatelessWidget {
                   label: 'Saved Addresses',
                   onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SavedAddressesScreen())),
                 ),
+                
+                24.verticalSpace,
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 24.w),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text('Legal', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.bold, color: AppColors.textDark.withValues(alpha: 0.4), letterSpacing: 1)),
+                  ),
+                ),
+                8.verticalSpace,
+                
+                _AccountMenuItem(
+                  icon: Icons.privacy_tip_outlined,
+                  label: 'Privacy Policy',
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen())),
+                ),
+                _AccountMenuItem(
+                  icon: Icons.description_outlined,
+                  label: 'Terms & Conditions',
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TermsConditionsScreen())),
+                ),
                 _AccountMenuItem(
                   icon: Icons.info_outline,
                   label: 'About App',
@@ -88,14 +111,29 @@ class AccountScreen extends StatelessWidget {
                 
                 Padding(
                   padding: EdgeInsets.symmetric(horizontal: 24.w),
-                  child: SizedBox(
-                    width: double.infinity,
-                    height: 56.h,
-                    child: OutlinedButton.icon(
-                      onPressed: () => authService.signOut(),
-                      icon: const Icon(Icons.logout),
-                      label: const Text('Sign Out'),
-                    ),
+                  child: Column(
+                    children: [
+                      SizedBox(
+                        width: double.infinity,
+                        height: 56.h,
+                        child: OutlinedButton.icon(
+                          onPressed: () => _showSignOutDialog(context, authService),
+                          icon: const Icon(Icons.logout),
+                          label: const Text('Sign Out'),
+                        ),
+                      ),
+                      16.verticalSpace,
+                      SizedBox(
+                        width: double.infinity,
+                        child: TextButton(
+                          onPressed: () => _showDeleteAccountDialog(context, authService),
+                          child: Text(
+                            'Delete Account',
+                            style: TextStyle(color: AppColors.error, fontWeight: FontWeight.w600, fontSize: 13.sp),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 
@@ -108,6 +146,58 @@ class AccountScreen extends StatelessWidget {
             ),
           );
         },
+      ),
+    );
+  }
+
+  void _showSignOutDialog(BuildContext context, AuthService authService) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Sign Out'),
+        content: const Text('Are you sure you want to sign out?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              authService.signOut();
+            },
+            child: const Text('Sign Out', style: TextStyle(color: AppColors.maroon, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteAccountDialog(BuildContext context, AuthService authService) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Account', style: TextStyle(color: AppColors.error)),
+        content: const Text(
+          'This action is permanent and cannot be undone. All your personal data, saved addresses, and order history will be deleted.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              try {
+                await authService.deleteAccount();
+                // Navigation to splash/login will be handled by the auth state stream in main.dart
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Could not delete account. You may need to log in again first.')),
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error, foregroundColor: Colors.white),
+            child: const Text('Delete Permanently'),
+          ),
+        ],
       ),
     );
   }

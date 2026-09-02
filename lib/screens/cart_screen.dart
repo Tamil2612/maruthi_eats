@@ -413,7 +413,7 @@ class _CancellationPolicy extends StatelessWidget {
           ),
           8.verticalSpace,
           Text(
-            'Note: If you cancel after the order is confirmed, a 100% cancellation fee will be applied.',
+            'Note: If you cancel after the order is being prepared, a 100% cancellation fee will be applied.',
             style: TextStyle(fontSize: 10.sp, color: AppColors.textDark.withValues(alpha: 0.4), height: 1.4),
           ),
           8.verticalSpace,

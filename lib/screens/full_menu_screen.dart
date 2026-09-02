@@ -26,7 +26,7 @@ class _FullMenuScreenState extends State<FullMenuScreen> {
   final Map<String, GlobalKey> _categoryKeys = {};
 
   String _searchQuery = '';
-  bool? _vegFilter; // null = all, true = veg, false = non-veg
+  int _dietFilter = 0; // 0 = all, 1 = veg, 2 = non-veg
 
   bool _isCollapsed = false;
 
@@ -130,7 +130,11 @@ class _FullMenuScreenState extends State<FullMenuScreen> {
                   final filteredItems = allItems.where((item) {
                     final matchesSearch = item.name.toLowerCase().contains(_searchQuery) ||
                         item.description.toLowerCase().contains(_searchQuery);
-                    final matchesDiet = _vegFilter == null || item.isVeg == _vegFilter;
+                    
+                    bool matchesDiet = true;
+                    if (_dietFilter == 1) matchesDiet = item.isVeg == true;
+                    if (_dietFilter == 2) matchesDiet = item.isVeg == false;
+
                     final matchesCategory = _selectedCategory == 'All' || item.category == _selectedCategory;
                     return matchesSearch && matchesDiet && matchesCategory;
                   }).toList();
@@ -244,76 +248,124 @@ class _FullMenuScreenState extends State<FullMenuScreen> {
   Widget _buildSearchAndFilters() {
     return Padding(
       padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 12.h),
-      child: Column(
+      child: Row(
         children: [
-          TextField(
-            controller: _searchController,
-            decoration: InputDecoration(
-              hintText: 'Search for favorite dishes...',
-              hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13.sp),
-              prefixIcon: const Icon(Icons.search, color: AppColors.maroon, size: 20),
-              suffixIcon: _searchQuery.isNotEmpty
-                  ? IconButton(
-                icon: const Icon(Icons.close, size: 18, color: Colors.grey),
-                onPressed: _searchController.clear,
-              )
-                  : null,
-              filled: true,
-              fillColor: AppColors.white,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16.r),
-                borderSide: BorderSide(color: AppColors.maroon.withValues(alpha: 0.1)),
+          Expanded(
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Search for favorite dishes...',
+                hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13.sp),
+                prefixIcon: const Icon(Icons.search, color: AppColors.maroon, size: 20),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.close, size: 18, color: Colors.grey),
+                        onPressed: _searchController.clear,
+                      )
+                    : null,
+                filled: true,
+                fillColor: AppColors.white,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16.r),
+                  borderSide: BorderSide(color: AppColors.maroon.withValues(alpha: 0.1)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16.r),
+                  borderSide: BorderSide(color: AppColors.maroon.withValues(alpha: 0.1)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16.r),
+                  borderSide: BorderSide(color: AppColors.maroon.withValues(alpha: 0.4), width: 1.4),
+                ),
+                contentPadding: EdgeInsets.symmetric(vertical: 0, horizontal: 16.w),
               ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16.r),
-                borderSide: BorderSide(color: AppColors.maroon.withValues(alpha: 0.1)),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16.r),
-                borderSide: BorderSide(color: AppColors.maroon.withValues(alpha: 0.4), width: 1.4),
-              ),
-              contentPadding: EdgeInsets.symmetric(vertical: 0, horizontal: 16.w),
             ),
           ),
-          14.verticalSpace,
-          Row(
+          12.horizontalSpace,
+          _buildFilterButton(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterButton() {
+    return PopupMenuButton<int>(
+      initialValue: _dietFilter,
+      onSelected: (int value) {
+        setState(() => _dietFilter = value);
+      },
+      itemBuilder: (context) => [
+        PopupMenuItem(
+          value: 0,
+          child: Row(
             children: [
-              _FilterPill(
-                label: 'Veg',
-                isSelected: _vegFilter == true,
-                color: AppColors.success,
-                onTap: () => setState(() => _vegFilter = (_vegFilter == true ? null : true)),
-              ),
+              Icon(Icons.restaurant, size: 18.r, color: AppColors.maroon),
               10.horizontalSpace,
-              _FilterPill(
-                label: 'Non-Veg',
-                isSelected: _vegFilter == false,
-                color: AppColors.error,
-                onTap: () => setState(() => _vegFilter = (_vegFilter == false ? null : false)),
-              ),
-              const Spacer(),
-              if (_vegFilter != null || _searchQuery.isNotEmpty || _selectedCategory != 'All')
-                TextButton(
-                  onPressed: () {
-                    _searchController.clear();
-                    setState(() {
-                      _vegFilter = null;
-                      _selectedCategory = 'All';
-                    });
-                  },
-                  style: TextButton.styleFrom(
-                    padding: EdgeInsets.symmetric(horizontal: 8.w),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  child: Text(
-                    'Clear all',
-                    style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.maroon.withValues(alpha: 0.6)),
-                  ),
-                ),
+              const Text('Show All'),
             ],
           ),
-        ],
+        ),
+        PopupMenuItem(
+          value: 1,
+          child: Row(
+            children: [
+              Icon(Icons.circle, size: 14.r, color: AppColors.success),
+              10.horizontalSpace,
+              const Text('Pure Veg'),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 2,
+          child: Row(
+            children: [
+              Icon(Icons.circle, size: 14.r, color: AppColors.error),
+              10.horizontalSpace,
+              const Text('Non-Veg'),
+            ],
+          ),
+        ),
+      ],
+      child: Container(
+        height: 44.h,
+        padding: EdgeInsets.symmetric(horizontal: 14.w),
+        decoration: BoxDecoration(
+          color: _dietFilter == 0 ? AppColors.white : (_dietFilter == 1 ? AppColors.success : AppColors.error),
+          borderRadius: BorderRadius.circular(16.r),
+          border: Border.all(
+            color: _dietFilter == 0 ? AppColors.maroon.withValues(alpha: 0.1) : Colors.transparent,
+          ),
+          boxShadow: [
+            if (_dietFilter != 0)
+              BoxShadow(
+                color: (_dietFilter == 1 ? AppColors.success : AppColors.error).withValues(alpha: 0.3),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              _dietFilter == 0 ? Icons.tune_rounded : Icons.filter_alt,
+              color: _dietFilter == 0 ? AppColors.maroon : Colors.white,
+              size: 20.r,
+            ),
+            if (_dietFilter != 0) ...[
+              8.horizontalSpace,
+              Text(
+                _dietFilter == 1 ? 'VEG' : 'NON-VEG',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 11.sp,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -437,57 +489,11 @@ class _FullMenuScreenState extends State<FullMenuScreen> {
               onPressed: () {
                 _searchController.clear();
                 setState(() {
-                  _vegFilter = null;
+                  _dietFilter = 0;
                   _selectedCategory = 'All';
                 });
               },
               child: Text('Reset all filters', style: TextStyle(color: AppColors.maroon, fontWeight: FontWeight.w800, fontSize: 13.sp)),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _FilterPill extends StatelessWidget {
-  final String label;
-  final bool isSelected;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _FilterPill({required this.label, required this.isSelected, required this.color, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10.r),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 8.h),
-        decoration: BoxDecoration(
-          color: isSelected ? color : AppColors.white,
-          border: Border.all(color: isSelected ? color : AppColors.maroon.withValues(alpha: 0.1), width: 1.w),
-          borderRadius: BorderRadius.circular(10.r),
-          boxShadow: isSelected ? [BoxShadow(color: color.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 4))] : [],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 8.r,
-              height: 8.r,
-              decoration: BoxDecoration(color: isSelected ? AppColors.white : color, shape: BoxShape.circle),
-            ),
-            10.horizontalSpace,
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12.sp,
-                fontWeight: FontWeight.w800,
-                color: isSelected ? Colors.white : AppColors.textDark.withValues(alpha: 0.8),
-              ),
             ),
           ],
         ),

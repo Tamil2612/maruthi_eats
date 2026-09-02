@@ -36,7 +36,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               .where('customer_id', isEqualTo: userId)
               .where('order_status', whereIn: [
               'placed',
-              'confirmed',
               'preparing',
               'out_for_delivery'
             ]).snapshots(),

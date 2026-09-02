@@ -19,7 +19,7 @@ class LiveOrderTracker extends StatelessWidget {
       stream: FirebaseFirestore.instance
           .collection('orders')
           .where('customer_id', isEqualTo: userId)
-          .where('order_status', whereIn: ['placed', 'confirmed', 'preparing', 'out_for_delivery'])
+          .where('order_status', whereIn: ['placed', 'preparing', 'out_for_delivery'])
           .snapshots(),
       builder: (context, snapshot) {
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
@@ -61,8 +61,6 @@ class _FloatingLiveOrderCard extends StatelessWidget {
         return 'assets/gifs/out_for_delivery.gif';
       case OrderStatus.preparing:
         return 'assets/gifs/frying-pan.gif';
-      case OrderStatus.confirmed:
-        return 'assets/gifs/waiting.gif';
       case OrderStatus.placed:
       default:
         return 'assets/gifs/waiting.gif';
@@ -75,8 +73,6 @@ class _FloatingLiveOrderCard extends StatelessWidget {
         return AppColors.info;
       case OrderStatus.preparing:
         return AppColors.gold;
-      case OrderStatus.confirmed:
-        return AppColors.success;
       default:
         return AppColors.maroon;
     }

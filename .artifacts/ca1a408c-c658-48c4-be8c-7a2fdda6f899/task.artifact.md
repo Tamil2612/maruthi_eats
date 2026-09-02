@@ -1,3 +1,0 @@
-- `[x]` Create `OrderSuccessScreen` with Lottie animation and 3s redirect
-- `[x]` Update `CheckoutScreen` to navigate to `OrderSuccessScreen`
-- `[x]` Verify the end-to-end checkout flow
