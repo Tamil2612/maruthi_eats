@@ -28,6 +28,7 @@ class CartFab extends StatelessWidget {
         largeSize: 20.r,
         padding: EdgeInsets.symmetric(horizontal: 6.w),
         child: FloatingActionButton(
+          tooltip: 'Open cart (${cart.itemCount} items)',
           onPressed: () => Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const CartScreen()),

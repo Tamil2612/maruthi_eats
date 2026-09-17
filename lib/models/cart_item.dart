@@ -12,6 +12,7 @@ class CartItem {
   final bool isOffer;
   final bool isFree;
   final String? parentOfferId;
+  final String? offerId;
   final String? offerDescription;
   
   // Reference to original objects if needed
@@ -29,6 +30,7 @@ class CartItem {
     this.isOffer = false,
     this.isFree = false,
     this.parentOfferId,
+    this.offerId,
     this.offerDescription,
     this.menuItem,
     this.offerModel,
@@ -45,6 +47,7 @@ class CartItem {
       'is_offer': isOffer,
       'is_free': isFree,
       if (parentOfferId != null) 'parent_offer_id': parentOfferId,
+      if (offerId != null) 'offer_id': offerId,
       if (offerDescription != null) 'offer_description': offerDescription,
     };
   }

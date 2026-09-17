@@ -60,6 +60,7 @@ class CartProvider extends ChangeNotifier {
           imageUrl: offer.imageUrl,
           isVeg: true,
           isOffer: true,
+          offerId: offer.id,
           offerDescription: desc,
           offerModel: offer,
         );
@@ -83,6 +84,7 @@ class CartProvider extends ChangeNotifier {
           isVeg: buyItem.isVeg,
           isOffer: true,
           parentOfferId: groupId,
+          offerId: offer.id,
           menuItem: buyItem,
           offerModel: offer,
           offerDescription: 'Part of: ${offer.title}',
@@ -101,6 +103,7 @@ class CartProvider extends ChangeNotifier {
           isOffer: true,
           isFree: true,
           parentOfferId: groupId,
+          offerId: offer.id,
           menuItem: getItem,
           offerModel: offer,
           offerDescription: 'FREE with ${offer.title}',
@@ -113,7 +116,16 @@ class CartProvider extends ChangeNotifier {
 
   void syncMenuItem(MenuItem freshItem) {
     if (_items.containsKey(freshItem.id)) {
-      final oldQty = _items[freshItem.id]!.quantity;
+      final oldItem = _items[freshItem.id]!;
+      final hasChanged = oldItem.name != freshItem.name ||
+          oldItem.unitPrice != freshItem.effectivePrice ||
+          oldItem.imageUrl != freshItem.imageUrl ||
+          oldItem.isVeg != freshItem.isVeg ||
+          oldItem.menuItem?.price != freshItem.price ||
+          oldItem.menuItem?.hasDiscount != freshItem.hasDiscount;
+      if (!hasChanged) return;
+
+      final oldQty = oldItem.quantity;
       _items[freshItem.id] = CartItem(
         id: freshItem.id,
         name: freshItem.name,

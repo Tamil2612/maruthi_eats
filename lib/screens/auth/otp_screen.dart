@@ -20,6 +20,12 @@ class _OtpScreenState extends State<OtpScreen> {
   String? _error;
 
   @override
+  void dispose() {
+    _otpController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.cream,

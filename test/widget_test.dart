@@ -1,30 +1,26 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:maruthi_eats/main.dart';
+import 'package:maruthi_eats/models/menu_item.dart';
+import 'package:maruthi_eats/providers/cart_provider.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MaruthiEatsApp());
+  test('cart totals reflect quantities and delivery fee', () {
+    final cart = CartProvider();
+    final item = MenuItem(
+      id: 'idli',
+      name: 'Idli',
+      description: '',
+      price: 40,
+      category: 'Breakfast',
+      imageUrl: '',
+      isVeg: true,
+    );
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    cart.addItem(item);
+    cart.addItem(item);
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
-
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    expect(cart.itemCount, 2);
+    expect(cart.subtotal, 80);
+    expect(cart.deliveryFee, 30);
+    expect(cart.totalPayable, 110);
   });
 }

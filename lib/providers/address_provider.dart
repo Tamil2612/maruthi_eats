@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import '../models/address_model.dart';
 import '../services/auth_service.dart';
@@ -8,16 +9,21 @@ class AddressProvider extends ChangeNotifier {
   List<AddressModel> _addresses = [];
   AddressModel? _selectedAddress;
   StreamSubscription? _subscription;
+  late final StreamSubscription<User?> _authSubscription;
 
   List<AddressModel> get addresses => _addresses;
   AddressModel? get selectedAddress => _selectedAddress;
 
   AddressProvider() {
-    _init();
+    _authSubscription = _authService.authStateChanges.listen(_bindUser);
   }
 
-  void _init() {
-    final user = _authService.currentUser;
+  void _bindUser(User? user) {
+    _subscription?.cancel();
+    _subscription = null;
+    _addresses = [];
+    _selectedAddress = null;
+
     if (user != null) {
       _subscription = _authService.watchAddresses(user.uid).listen((list) {
         _addresses = list;
@@ -38,6 +44,7 @@ class AddressProvider extends ChangeNotifier {
         notifyListeners();
       });
     }
+    notifyListeners();
   }
 
   void selectAddress(AddressModel address) {
@@ -48,6 +55,7 @@ class AddressProvider extends ChangeNotifier {
   @override
   void dispose() {
     _subscription?.cancel();
+    _authSubscription.cancel();
     super.dispose();
   }
 }

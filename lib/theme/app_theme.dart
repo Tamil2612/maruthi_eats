@@ -95,6 +95,7 @@ class AppTheme {
             fontSize: 14.sp,
           ),
           elevation: 0,
+          minimumSize: Size(0, 48.h),
         ),
       ),
 
@@ -184,6 +185,13 @@ class AppTheme {
       dividerTheme: DividerThemeData(
         color: AppColors.textDark.withValues(alpha: 0.08),
         thickness: 1,
+      ),
+
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: AppColors.textDark,
+        contentTextStyle: GoogleFonts.poppins(color: AppColors.white),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
       ),
     );
   }

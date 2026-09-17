@@ -18,6 +18,12 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
   String? _error;
 
   @override
+  void dispose() {
+    _phoneController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.cream,

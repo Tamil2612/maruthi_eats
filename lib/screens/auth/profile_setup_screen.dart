@@ -21,6 +21,14 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   bool _saving = false;
   String? _error;
 
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _dobController.dispose();
+    super.dispose();
+  }
+
   Widget _buildFieldLabel(String label) {
     return Text(
       label,

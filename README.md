@@ -73,6 +73,17 @@ The application is fully optimized for web deployment, specifically targeting iO
 flutter build web --release
 ```
 
+### Configure Google Maps keys
+
+Use separate, restricted Maps API keys for Android and web. Supply the Android
+key as the `MAPS_API_KEY` Gradle project property (for example, through CI or
+your user-level `~/.gradle/gradle.properties`), and replace
+`{{MAPS_API_KEY}}` in the generated web deployment artifact during CI/CD. Do
+not commit either key.
+
+Restrict the Android key to `com.example.maruthi_eats` and its signing
+certificate SHA-1, and restrict the web key to the production site origins.
+
 ### Deploy to Firebase
 ```bash
 firebase deploy --only hosting:customer

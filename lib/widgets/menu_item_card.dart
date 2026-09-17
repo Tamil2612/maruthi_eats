@@ -152,7 +152,7 @@ class _AddButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: 90.w,
-      height: 34.h,
+      height: 40.h,
       decoration: BoxDecoration(
         color: AppColors.white,
         borderRadius: BorderRadius.circular(8.r),
@@ -183,7 +183,7 @@ class _QuantityStepper extends StatelessWidget {
     final cart = context.read<CartProvider>();
     return Container(
       width: 90.w,
-      height: 34.h,
+      height: 40.h,
       decoration: BoxDecoration(
         color: AppColors.maroon,
         borderRadius: BorderRadius.circular(8.r),

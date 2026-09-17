@@ -28,8 +28,6 @@ class _FullMenuScreenState extends State<FullMenuScreen> {
   String _searchQuery = '';
   int _dietFilter = 0; // 0 = all, 1 = veg, 2 = non-veg
 
-  bool _isCollapsed = false;
-
   late final Stream<QuerySnapshot> _categoriesStream =
   FirebaseFirestore.instance.collection('categories').orderBy('order').snapshots();
   late final Stream<QuerySnapshot> _menuItemsStream =
@@ -41,14 +39,6 @@ class _FullMenuScreenState extends State<FullMenuScreen> {
     _selectedCategory = widget.initialCategory ?? 'All';
     _searchController.addListener(() {
       setState(() => _searchQuery = _searchController.text.toLowerCase());
-    });
-
-    _scrollController.addListener(() {
-      final collapsed = _scrollController.hasClients && 
-                        _scrollController.offset > (90.h - kToolbarHeight - MediaQuery.of(context).padding.top - 10);
-      if (collapsed != _isCollapsed) {
-        setState(() => _isCollapsed = collapsed);
-      }
     });
 
     // Initial scroll to category if provided
@@ -69,6 +59,7 @@ class _FullMenuScreenState extends State<FullMenuScreen> {
 
   void _scrollChipIntoView(String category) {
     Future.delayed(const Duration(milliseconds: 100), () {
+      if (!mounted) return;
       final key = _categoryKeys[category];
       if (key != null && key.currentContext != null) {
         Scrollable.ensureVisible(
@@ -120,10 +111,23 @@ class _FullMenuScreenState extends State<FullMenuScreen> {
                       .map((doc) => MenuItem.fromFirestore(doc.id, doc.data() as Map<String, dynamic>))
                       .toList();
 
-                  final cartProvider = context.read<CartProvider>();
-                  for (var item in allItems) {
-                    cartProvider.syncMenuItem(item);
+                  // Keep the menu usable when a category document is missing.
+                  // Menu items remain the source of truth for their category.
+                  for (final item in allItems) {
+                    if (!categories.contains(item.category)) {
+                      categories.add(item.category);
+                    }
                   }
+
+                  // Provider state must not be updated while this stream is
+                  // building. Sync changed prices after the current frame.
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (!mounted) return;
+                    final cartProvider = context.read<CartProvider>();
+                    for (final item in allItems) {
+                      cartProvider.syncMenuItem(item);
+                    }
+                  });
 
                   if (allItems.isEmpty) return const _EmptyMenuState();
 
@@ -200,17 +204,15 @@ class _FullMenuScreenState extends State<FullMenuScreen> {
       surfaceTintColor: AppColors.maroon,
       iconTheme: const IconThemeData(color: AppColors.gold, size: 20),
       expandedHeight: 90.h,
-      automaticallyImplyLeading: false,
-      leading: _isCollapsed
-          ? IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new),
-              onPressed: () => Navigator.pop(context),
-            )
-          : null,
+      leading: IconButton(
+        tooltip: 'Back',
+        icon: const Icon(Icons.arrow_back_ios_new),
+        onPressed: () => Navigator.maybePop(context),
+      ),
       centerTitle: false,
       flexibleSpace: FlexibleSpaceBar(
         titlePadding: EdgeInsets.only(
-          left: _isCollapsed ? 56.w : 16.w, 
+          left: 56.w,
           bottom: 16.h
         ),
         title: Text(

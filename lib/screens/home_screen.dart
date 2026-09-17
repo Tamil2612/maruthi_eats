@@ -8,7 +8,6 @@ import '../widgets/skeleton_loaders.dart';
 import '../widgets/offer_details_sheet.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'full_menu_screen.dart';
-import 'offers_list_screen.dart';
 import '../models/offer.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -34,12 +33,6 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('MARUTHI EATS'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_none),
-            onPressed: () {},
-          ),
-        ],
       ),
       body: Stack(
         children: [
@@ -342,6 +335,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   Text(
                     name,
                     textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                         fontSize: 11.sp,
                         fontWeight: FontWeight.w600,

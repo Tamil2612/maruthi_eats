@@ -2,9 +2,9 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import '../providers/cart_provider.dart';
 import '../providers/address_provider.dart';
+import '../models/cart_item.dart';
 import '../theme/app_theme.dart';
 import 'package:flutter/material.dart';
-import '../models/address_model.dart';
 import 'checkout_screen.dart';
 import 'full_menu_screen.dart';
 import 'coupons_screen.dart';
@@ -109,12 +109,11 @@ class CartScreen extends StatelessWidget {
 }
 
 class _CartItemRow extends StatelessWidget {
-  final dynamic item; // CartItem
+  final CartItem item;
   const _CartItemRow({required this.item});
 
   @override
   Widget build(BuildContext context) {
-    final bool isLinkedBogo = item.parentOfferId != null;
 
     return Padding(
       padding: EdgeInsets.symmetric(vertical: 4.h),
@@ -174,7 +173,7 @@ class _CartItemRow extends StatelessWidget {
             children: [
               if (!item.isFree) // Free items don't have their own stepper
                 Container(
-                  height: 30.h,
+                  height: 40.h,
                   decoration: BoxDecoration(
                     color: AppColors.white,
                     border: Border.all(color: AppColors.maroon.withValues(alpha: 0.2)),
@@ -196,7 +195,7 @@ class _CartItemRow extends StatelessWidget {
                           }
                         },
                         child: Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 8.w),
+                          padding: EdgeInsets.symmetric(horizontal: 12.w),
                           child: Icon(Icons.remove, size: 14.r, color: AppColors.maroon),
                         ),
                       ),
@@ -207,7 +206,7 @@ class _CartItemRow extends StatelessWidget {
                       InkWell(
                         onTap: () => context.read<CartProvider>().incrementItem(item.id),
                         child: Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 8.w),
+                          padding: EdgeInsets.symmetric(horizontal: 12.w),
                           child: Icon(Icons.add, size: 14.r, color: AppColors.maroon),
                         ),
                       ),
@@ -417,10 +416,6 @@ class _CancellationPolicy extends StatelessWidget {
             style: TextStyle(fontSize: 10.sp, color: AppColors.textDark.withValues(alpha: 0.4), height: 1.4),
           ),
           8.verticalSpace,
-          Text(
-            'Read cancellation policy',
-            style: TextStyle(fontSize: 10.sp, color: AppColors.error, fontWeight: FontWeight.bold, decoration: TextDecoration.underline),
-          ),
         ],
       ),
     );

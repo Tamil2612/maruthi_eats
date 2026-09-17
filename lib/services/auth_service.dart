@@ -163,17 +163,29 @@ class AuthService {
 
     final uid = user.uid;
 
-    // 1. Delete addresses subcollection
-    final addresses = await _db.collection('users').doc(uid).collection('addresses').get();
-    for (var doc in addresses.docs) {
-      await doc.reference.delete();
-    }
+    // Delete dependent documents in batches to stay below Firestore's
+    // 500-operation batch limit.
+    await _deleteQuery(_db.collection('users').doc(uid).collection('addresses'));
+    await _deleteQuery(_db.collection('orders').where('customer_id', isEqualTo: uid));
 
-    // 2. Delete user document
+    // Delete the profile only after dependent data is gone.
     await _db.collection('users').doc(uid).delete();
 
-    // 3. Delete auth account
+    // Finally delete the authentication account.
     await user.delete();
+  }
+
+  Future<void> _deleteQuery(Query<Map<String, dynamic>> query) async {
+    while (true) {
+      final snapshot = await query.limit(450).get();
+      if (snapshot.docs.isEmpty) return;
+
+      final batch = _db.batch();
+      for (final doc in snapshot.docs) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+    }
   }
 
   Future<void> signOut() => _auth.signOut();

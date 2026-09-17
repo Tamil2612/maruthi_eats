@@ -33,7 +33,6 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
   @override
   void initState() {
     super.initState();
-    _getCurrentLocation();
     if (widget.address != null) {
       _selectedLocation = LatLng(widget.address!.latitude, widget.address!.longitude);
       _addressController.text = widget.address!.fullAddress;
@@ -57,12 +56,11 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
     final user = _authService.currentUser;
     if (user != null) {
       final userData = await _authService.watchUser(user.uid).first;
-      if (userData != null) {
-        setState(() {
-          _nameController.text = userData.name;
-          _phoneController.text = userData.phone;
-        });
-      }
+      if (!mounted || userData == null) return;
+      setState(() {
+        _nameController.text = userData.name;
+        _phoneController.text = userData.phone;
+      });
     }
   }
 
@@ -87,6 +85,7 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
   }
 
   void _updateLocation(LatLng location) async {
+    if (!mounted) return;
     setState(() {
       _selectedLocation = location;
     });
@@ -97,24 +96,32 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
       if (!kIsWeb) {
         List<geo.Placemark> placemarks = await geo.Geocoding()
             .placemarkFromCoordinates(location.latitude, location.longitude);
-        if (placemarks.isNotEmpty) {
-          final p = placemarks.first;
-          final components = [
-            p.name,
-            p.subLocality,
-            p.locality,
-            p.postalCode,
-          ].where((s) => s != null && s.isNotEmpty && s!.toLowerCase() != "null").toList();
-          
-          final addr = components.join(", ");
-          setState(() {
-            _addressController.text = addr;
-          });
-        }
+        if (!mounted || placemarks.isEmpty) return;
+        final p = placemarks.first;
+        final components = [
+          p.name,
+          p.subLocality,
+          p.locality,
+          p.postalCode,
+        ].where((s) => s != null && s.isNotEmpty && s.toLowerCase() != "null").toList();
+
+        final addr = components.join(", ");
+        setState(() {
+          _addressController.text = addr;
+        });
       }
     } catch (e) {
       debugPrint("Reverse geocoding error: $e");
     }
+  }
+
+  @override
+  void dispose() {
+    _labelController.dispose();
+    _addressController.dispose();
+    _nameController.dispose();
+    _phoneController.dispose();
+    super.dispose();
   }
 
   @override

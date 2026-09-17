@@ -5,7 +5,6 @@ import 'package:intl/intl.dart';
 import '../models/order.dart';
 import '../theme/app_theme.dart';
 import '../widgets/order_status_animation.dart';
-import '../widgets/order_status_stepper.dart';
 
 class OrderTrackingScreen extends StatelessWidget {
   final String orderId;

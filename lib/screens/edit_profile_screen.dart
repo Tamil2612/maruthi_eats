@@ -20,6 +20,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   bool _saving = false;
 
   @override
+  void dispose() {
+    _nameController.dispose();
+    _phoneController.dispose();
+    _emailController.dispose();
+    _dobController.dispose();
+    super.dispose();
+  }
+
+  @override
   void initState() {
     super.initState();
     _loadUserData();

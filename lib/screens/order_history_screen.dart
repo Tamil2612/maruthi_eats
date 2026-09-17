@@ -144,12 +144,20 @@ class _OrderHistoryCardState extends State<_OrderHistoryCard> {
 
         if (isOffer) {
           // Handle Offer
-          String offerDocId = itemId;
-          if (itemId.startsWith('offer_'))
+          final storedOfferId = itemData['offer_id'];
+          final hasStoredOfferId =
+              storedOfferId is String && storedOfferId.isNotEmpty;
+          String offerDocId = hasStoredOfferId ? storedOfferId : itemId;
+          if (!hasStoredOfferId && itemId.startsWith('offer_')) {
             offerDocId = itemId.replaceFirst('offer_', '');
-          if (itemId.startsWith('bogo_')) {
-            // For BOGO, itemId is bogo_{id}_buy
-            offerDocId = itemId.split('_')[1];
+          }
+          if (!hasStoredOfferId && itemId.startsWith('bogo_')) {
+            // Legacy orders did not store an explicit offer ID. Remove only
+            // the known wrapper and suffix so IDs containing underscores work.
+            offerDocId = itemId.substring('bogo_'.length);
+            if (offerDocId.endsWith('_buy') || offerDocId.endsWith('_get')) {
+              offerDocId = offerDocId.substring(0, offerDocId.length - 4);
+            }
           }
 
           final offerDoc = await db.collection('offers').doc(offerDocId).get();
@@ -180,7 +188,9 @@ class _OrderHistoryCardState extends State<_OrderHistoryCard> {
               } else {
                 // Combo
                 // Check if all items in combo are available? (Optional, but safer)
-                cart.addOffer(offer);
+                for (int q = 0; q < qty; q++) {
+                  cart.addOffer(offer);
+                }
                 addedCount++;
               }
             } else {

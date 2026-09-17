@@ -5,12 +5,10 @@ import 'package:provider/provider.dart';
 import '../providers/cart_provider.dart';
 import '../providers/address_provider.dart';
 import 'package:flutter/material.dart';
-import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 import '../models/address_model.dart';
 import 'saved_addresses_screen.dart';
 import 'order_success_screen.dart';
-import 'order_tracking_screen.dart';
 
 enum PaymentChoice { upi, cod }
 
@@ -22,7 +20,6 @@ class CheckoutScreen extends StatefulWidget {
 }
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
-  final _authService = AuthService();
   PaymentChoice _payment = PaymentChoice.upi;
   bool _placing = false;
 
@@ -307,39 +304,46 @@ class _PaymentOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12.r),
-      child: Container(
-        padding: EdgeInsets.all(14.r),
-        decoration: BoxDecoration(
-          color: selected ? AppColors.maroon.withValues(alpha: 0.06) : AppColors.white,
-          borderRadius: BorderRadius.circular(12.r),
-          border: Border.all(
-            color: selected ? AppColors.maroon : AppColors.grey.withValues(alpha: 0.3),
-            width: selected ? 1.5.w : 1.w,
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: '$title. $subtitle',
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12.r),
+        child: Container(
+          padding: EdgeInsets.all(14.r),
+          decoration: BoxDecoration(
+            color: selected
+                ? AppColors.maroon.withValues(alpha: 0.06)
+                : AppColors.white,
+            borderRadius: BorderRadius.circular(12.r),
+            border: Border.all(
+              color: selected ? AppColors.maroon : AppColors.grey.withValues(alpha: 0.3),
+              width: selected ? 1.5.w : 1.w,
+            ),
           ),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, color: AppColors.maroon, size: 24.r),
-            12.horizontalSpace,
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14.sp)),
-                  Text(subtitle,
-                      style: TextStyle(fontSize: 12.sp, color: AppColors.textDark.withValues(alpha: 0.6))),
-                ],
+          child: Row(
+            children: [
+              Icon(icon, color: AppColors.maroon, size: 24.r),
+              12.horizontalSpace,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14.sp)),
+                    Text(subtitle,
+                        style: TextStyle(fontSize: 12.sp, color: AppColors.textDark.withValues(alpha: 0.6))),
+                  ],
+                ),
               ),
-            ),
-            Icon(
-              selected ? Icons.radio_button_checked : Icons.radio_button_off,
-              color: selected ? AppColors.maroon : AppColors.grey,
-              size: 20.r,
-            ),
-          ],
+              Icon(
+                selected ? Icons.radio_button_checked : Icons.radio_button_off,
+                color: selected ? AppColors.maroon : AppColors.grey,
+                size: 20.r,
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -26,6 +26,10 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        // Supply with -PMAPS_API_KEY=... in local/CI Gradle configuration.
+        // Do not commit a Maps API key in the manifest.
+        manifestPlaceholders["MAPS_API_KEY"] =
+            providers.gradleProperty("MAPS_API_KEY").orElse("").get()
     }
 
     buildTypes {
