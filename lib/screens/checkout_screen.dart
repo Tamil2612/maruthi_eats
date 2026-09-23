@@ -1,6 +1,6 @@
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_functions/cloud_functions.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
 import 'package:provider/provider.dart';
 import '../providers/cart_provider.dart';
 import '../providers/address_provider.dart';
@@ -12,6 +12,9 @@ import 'order_success_screen.dart';
 
 enum PaymentChoice { upi, cod }
 
+// Must match the `region=` set on every function in backend/functions/main.py.
+const String _functionsRegion = 'asia-south1';
+
 class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({super.key});
 
@@ -22,6 +25,28 @@ class CheckoutScreen extends StatefulWidget {
 class _CheckoutScreenState extends State<CheckoutScreen> {
   PaymentChoice _payment = PaymentChoice.upi;
   bool _placing = false;
+  late final Razorpay _razorpay;
+
+  // Set once place_order succeeds. If a later step (opening the Razorpay
+  // session) fails and the user retries, we reuse this instead of calling
+  // place_order again — otherwise a network hiccup between order creation
+  // and payment would create a duplicate order on every retry.
+  String? _pendingOrderId;
+
+  @override
+  void initState() {
+    super.initState();
+    _razorpay = Razorpay()
+      ..on(Razorpay.EVENT_PAYMENT_SUCCESS, _onPaymentSuccess)
+      ..on(Razorpay.EVENT_PAYMENT_ERROR, _onPaymentError)
+      ..on(Razorpay.EVENT_EXTERNAL_WALLET, _onExternalWallet);
+  }
+
+  @override
+  void dispose() {
+    _razorpay.clear();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -121,8 +146,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   ),
                   child: _placing
                       ? SizedBox(
-                          height: 20.h, width: 20.w,
-                          child: CircularProgressIndicator(strokeWidth: 2.w, color: AppColors.gold))
+                      height: 20.h, width: 20.w,
+                      child: CircularProgressIndicator(strokeWidth: 2.w, color: AppColors.gold))
                       : Text(_payment == PaymentChoice.upi ? 'Pay & Place Order' : 'Place Order'),
                 ),
               ),
@@ -135,7 +160,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Future<void> _placeOrder(BuildContext context, CartProvider cart) async {
     final selectedAddress = context.read<AddressProvider>().selectedAddress;
-    
+
     if (selectedAddress == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select a delivery address')),
@@ -146,44 +171,101 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     setState(() => _placing = true);
 
     try {
-      final userId = FirebaseAuth.instance.currentUser?.uid ?? 'guest';
+      String orderId;
+      if (_pendingOrderId != null) {
+        // Reuse the order from a previous attempt — see field comment.
+        orderId = _pendingOrderId!;
+      } else {
+        final result = await FirebaseFunctions.instanceFor(region: _functionsRegion)
+            .httpsCallable('place_order')
+            .call({
+          'items': cart.items.values.map((c) => c.toOrderMap()).toList(),
+          'coupon_code': cart.appliedCoupon?.code,
+          'payment_mode': _payment == PaymentChoice.upi ? 'upi' : 'cod',
+          'delivery_address': selectedAddress.fullAddress,
+          'address_label': selectedAddress.label,
+          'latitude': selectedAddress.latitude,
+          'longitude': selectedAddress.longitude,
+        });
+        orderId = result.data['order_id'] as String;
+        _pendingOrderId = orderId;
+      }
 
-      final orderRef = await FirebaseFirestore.instance.collection('orders').add({
-        'customer_id': userId,
-        'items': cart.items.values.map((c) => c.toOrderMap()).toList(),
-        'item_total': cart.subtotal,
-        'delivery_fee': cart.deliveryFee,
-        'coupon_code': cart.appliedCoupon?.code,
-        'coupon_discount': cart.couponDiscount,
-        'total': cart.totalPayable,
-        'payment_mode': _payment == PaymentChoice.upi ? 'upi' : 'cod',
-        'payment_status': _payment == PaymentChoice.upi ? 'pending' : 'cod_pending',
-        'order_status': 'placed',
-        'delivery_address': selectedAddress.fullAddress,
-        'address_label': selectedAddress.label,
-        'latitude': selectedAddress.latitude,
-        'longitude': selectedAddress.longitude,
-        'created_at': FieldValue.serverTimestamp(),
+      if (_payment == PaymentChoice.cod) {
+        _pendingOrderId = null;
+        cart.clear();
+        if (!context.mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => OrderSuccessScreen(orderId: orderId)),
+        );
+        return;
+      }
+
+      // UPI: open a Razorpay checkout session for the order just created.
+      // Cart is only cleared and _placing reset once a payment result
+      // comes back — see _onPaymentSuccess/_onPaymentError below — since
+      // we're now waiting on the user inside the Razorpay UI, not on
+      // anything awaited here.
+      final session = await FirebaseFunctions.instanceFor(region: _functionsRegion)
+          .httpsCallable('razorpay_create_order')
+          .call({'order_id': orderId});
+
+      _razorpay.open({
+        'key': session.data['key_id'],
+        'amount': session.data['amount'],
+        'order_id': session.data['razorpay_order_id'],
+        'name': 'Maruthi Eats',
+        'description': 'Order #${orderId.substring(0, 6).toUpperCase()}',
       });
-
-      // TODO: if _payment == PaymentChoice.upi, trigger the Razorpay/Cashfree
-      // checkout flow here once the backend payment-session endpoint exists.
-
-      cart.clear();
-
+    } on FirebaseFunctionsException catch (e) {
+      // e.message carries the specific reason the backend rejected the
+      // order (e.g. "Coupon has expired", "Item no longer available")
+      // instead of a raw exception string.
       if (!context.mounted) return;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => OrderSuccessScreen(orderId: orderRef.id)),
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message ?? 'Could not place order. Please try again.')),
       );
+      setState(() => _placing = false);
     } catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Could not place order: $e')),
       );
-    } finally {
-      if (mounted) setState(() => _placing = false);
+      setState(() => _placing = false);
     }
+  }
+
+  void _onPaymentSuccess(PaymentSuccessResponse response) {
+    // This confirms the Razorpay checkout UI reported success — the
+    // authoritative payment_status update still comes from
+    // razorpay_webhook (signature-verified server-side), not from here.
+    final orderId = _pendingOrderId;
+    _pendingOrderId = null;
+    if (mounted) setState(() => _placing = false);
+    if (orderId == null || !mounted) return;
+
+    context.read<CartProvider>().clear();
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => OrderSuccessScreen(orderId: orderId)),
+    );
+  }
+
+  void _onPaymentError(PaymentFailureResponse response) {
+    // The order document itself is left as-is (payment_status stays
+    // 'pending' unless razorpay_webhook has already marked it 'failed').
+    // _pendingOrderId is kept so retrying reuses the same order instead
+    // of creating a duplicate.
+    if (mounted) setState(() => _placing = false);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Payment failed: ${response.message ?? 'Please try again.'}')),
+    );
+  }
+
+  void _onExternalWallet(ExternalWalletResponse response) {
+    if (mounted) setState(() => _placing = false);
   }
 
   Widget _buildAddressSection(BuildContext context, AddressModel? selectedAddress, List<AddressModel> allAddresses) {
@@ -230,7 +312,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 children: [
                   Text(selectedAddress.label, style: const TextStyle(fontWeight: FontWeight.bold)),
                   4.verticalSpace,
-                  Text(selectedAddress.fullAddress, 
+                  Text(selectedAddress.fullAddress,
                       style: TextStyle(fontSize: 13.sp, color: AppColors.textDark.withValues(alpha: 0.6))),
                 ],
               ),
@@ -270,15 +352,15 @@ class _CheckoutBillDetails extends StatelessWidget {
           Text(
             label,
             style: TextStyle(
-              fontSize: 13.sp, 
-              color: isDiscount ? AppColors.success : AppColors.textDark.withValues(alpha: 0.6)
+                fontSize: 13.sp,
+                color: isDiscount ? AppColors.success : AppColors.textDark.withValues(alpha: 0.6)
             ),
           ),
           Text(
             '${amount < 0 ? "-" : ""}₹${amount.abs().toStringAsFixed(2)}',
             style: TextStyle(
-              fontSize: 13.sp, 
-              color: isDiscount ? AppColors.success : AppColors.textDark.withValues(alpha: 0.8)
+                fontSize: 13.sp,
+                color: isDiscount ? AppColors.success : AppColors.textDark.withValues(alpha: 0.8)
             ),
           ),
         ],

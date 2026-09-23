@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import '../models/app_user.dart';
 import '../models/address_model.dart';
 
@@ -113,8 +115,8 @@ class AuthService {
         .collection('addresses')
         .snapshots()
         .map((snapshot) => snapshot.docs
-            .map((doc) => AddressModel.fromFirestore(doc.id, doc.data()))
-            .toList());
+        .map((doc) => AddressModel.fromFirestore(doc.id, doc.data()))
+        .toList());
   }
 
   Future<void> saveAddress({
@@ -155,6 +157,34 @@ class AuthService {
         .collection('addresses')
         .doc(addressId)
         .delete();
+  }
+
+  // --- Push notifications ---
+  //
+  // Saves this device's FCM token onto the user's doc so the backend's
+  // on_order_status_updated Cloud Function (see backend/functions/main.py)
+  // can send order-status push notifications. Call once per app session
+  // after the user is confirmed signed in with a completed profile — see
+  // MainNavigationScreen.initState().
+  Future<void> saveFcmToken(String uid) async {
+    try {
+      await FirebaseMessaging.instance.requestPermission();
+      final token = await FirebaseMessaging.instance.getToken();
+      if (token != null) {
+        await _db.collection('users').doc(uid).set({'fcm_token': token}, SetOptions(merge: true));
+      }
+    } catch (_) {
+      // Non-fatal — notification-only feature, shouldn't block app usage
+      // (e.g. permission denied, no Google Play Services on the device).
+    }
+  }
+
+  /// Keeps the saved token current if Firebase rotates it. Returns the
+  /// subscription so the caller can cancel it on dispose.
+  StreamSubscription<String> listenForTokenRefresh(String uid) {
+    return FirebaseMessaging.instance.onTokenRefresh.listen((newToken) {
+      _db.collection('users').doc(uid).set({'fcm_token': newToken}, SetOptions(merge: true));
+    });
   }
 
   Future<void> deleteAccount() async {
