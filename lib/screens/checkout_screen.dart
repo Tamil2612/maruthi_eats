@@ -1,6 +1,8 @@
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:cloud_functions/cloud_functions.dart';
-// import 'package:razorpay_flutter/razorpay_flutter.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
 import 'package:provider/provider.dart';
 import '../providers/cart_provider.dart';
 import '../providers/address_provider.dart';
@@ -25,8 +27,7 @@ class CheckoutScreen extends StatefulWidget {
 class _CheckoutScreenState extends State<CheckoutScreen> {
   PaymentChoice _payment = PaymentChoice.upi;
   bool _placing = false;
-  // Razorpay commented out for now:
-  // late final Razorpay _razorpay;
+  late final Razorpay _razorpay;
 
   // Set once place_order succeeds. If a later step (opening the Razorpay
   // session) fails and the user retries, we reuse this instead of calling
@@ -37,16 +38,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   @override
   void initState() {
     super.initState();
-    // Razorpay disabled for now:
-    // _razorpay = Razorpay()
-    //   ..on(Razorpay.EVENT_PAYMENT_SUCCESS, _onPaymentSuccess)
-    //   ..on(Razorpay.EVENT_PAYMENT_ERROR, _onPaymentError)
-    //   ..on(Razorpay.EVENT_EXTERNAL_WALLET, _onExternalWallet);
+    _razorpay = Razorpay()
+      ..on(Razorpay.EVENT_PAYMENT_SUCCESS, _onPaymentSuccess)
+      ..on(Razorpay.EVENT_PAYMENT_ERROR, _onPaymentError)
+      ..on(Razorpay.EVENT_EXTERNAL_WALLET, _onExternalWallet);
   }
 
   @override
   void dispose() {
-    // _razorpay.clear();
+    _razorpay.clear();
     super.dispose();
   }
 
@@ -192,13 +192,47 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         _pendingOrderId = orderId;
       }
 
-      _pendingOrderId = null;
-      cart.clear();
-      if (!context.mounted) return;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => OrderSuccessScreen(orderId: orderId)),
-      );
+      if (_payment == PaymentChoice.cod) {
+        _pendingOrderId = null;
+        cart.clear();
+        if (!context.mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => OrderSuccessScreen(orderId: orderId)),
+        );
+        return;
+      }
+
+      // UPI Payment: Create Razorpay Order session on backend
+      try {
+        final user = FirebaseAuth.instance.currentUser;
+        final session = await FirebaseFunctions.instanceFor(region: _functionsRegion)
+            .httpsCallable('razorpay_create_order')
+            .call({'order_id': orderId});
+
+        final keyId = session.data['key_id'] as String;
+        final amount = session.data['amount'] as int;
+        final razorpayOrderId = session.data['razorpay_order_id'] as String;
+
+        _razorpay.open({
+          'key': keyId,
+          'amount': amount,
+          'order_id': razorpayOrderId,
+          'name': 'Maruthi Eats',
+          'description': 'Order #${orderId.substring(0, 6).toUpperCase()}',
+          'prefill': {
+            'contact': user?.phoneNumber ?? '',
+            'email': user?.email ?? '',
+          },
+          'external': {
+            'wallets': ['paytm']
+          }
+        });
+      } catch (razorpayError) {
+        // Clean up temporary order document if Razorpay session fails to initialize
+        await _cleanupPendingOrder(orderId);
+        rethrow;
+      }
     } on FirebaseFunctionsException catch (e) {
       debugPrint('FirebaseFunctionsException: code=${e.code}, message=${e.message}, details=${e.details}');
       if (!context.mounted) return;
@@ -210,37 +244,65 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       debugPrint('Order placement error: $e');
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not place order: $e')),
+        SnackBar(content: Text('Could not start payment: $e')),
       );
       setState(() => _placing = false);
     }
   }
 
-  // Razorpay Callbacks commented out for now:
-  // void _onPaymentSuccess(PaymentSuccessResponse response) {
-  //   final orderId = _pendingOrderId;
-  //   _pendingOrderId = null;
-  //   if (mounted) setState(() => _placing = false);
-  //   if (orderId == null || !mounted) return;
-  //
-  //   context.read<CartProvider>().clear();
-  //   Navigator.pushReplacement(
-  //     context,
-  //     MaterialPageRoute(builder: (_) => OrderSuccessScreen(orderId: orderId)),
-  //   );
-  // }
-  //
-  // void _onPaymentError(PaymentFailureResponse response) {
-  //   if (mounted) setState(() => _placing = false);
-  //   if (!mounted) return;
-  //   ScaffoldMessenger.of(context).showSnackBar(
-  //     SnackBar(content: Text('Payment failed: ${response.message ?? 'Please try again.'}')),
-  //   );
-  // }
-  //
-  // void _onExternalWallet(ExternalWalletResponse response) {
-  //   if (mounted) setState(() => _placing = false);
-  // }
+  Future<void> _cleanupPendingOrder(String? orderId) async {
+    final idToDelete = orderId ?? _pendingOrderId;
+    _pendingOrderId = null;
+    if (idToDelete != null) {
+      try {
+        await FirebaseFirestore.instance.collection('orders').doc(idToDelete).delete();
+      } catch (e) {
+        debugPrint('Error cleaning up unpaid pending order: $e');
+      }
+    }
+  }
+
+  void _onPaymentSuccess(PaymentSuccessResponse response) async {
+    final orderId = _pendingOrderId;
+    _pendingOrderId = null;
+
+    if (orderId != null) {
+      try {
+        // Confirm payment and finalize order status in Firestore
+        await FirebaseFirestore.instance.collection('orders').doc(orderId).update({
+          'payment_status': 'paid',
+          'order_status': 'placed',
+          'razorpay_payment_id': response.paymentId,
+        });
+      } catch (e) {
+        debugPrint('Error updating payment status locally: $e');
+      }
+    }
+
+    if (mounted) setState(() => _placing = false);
+    if (orderId == null || !mounted) return;
+
+    context.read<CartProvider>().clear();
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => OrderSuccessScreen(orderId: orderId)),
+    );
+  }
+
+  void _onPaymentError(PaymentFailureResponse response) async {
+    final failedOrderId = _pendingOrderId;
+    await _cleanupPendingOrder(failedOrderId);
+
+    if (mounted) setState(() => _placing = false);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Payment cancelled/failed: ${response.message ?? 'Please try again.'}')),
+    );
+  }
+
+  void _onExternalWallet(ExternalWalletResponse response) {
+    if (mounted) setState(() => _placing = false);
+  }
 
   Widget _buildAddressSection(BuildContext context, AddressModel? selectedAddress, List<AddressModel> allAddresses) {
     if (allAddresses.isEmpty) {
