@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'notification_service.dart';
 import '../models/app_user.dart';
 import '../models/address_model.dart';
 
@@ -167,16 +168,7 @@ class AuthService {
   // after the user is confirmed signed in with a completed profile — see
   // MainNavigationScreen.initState().
   Future<void> saveFcmToken(String uid) async {
-    try {
-      await FirebaseMessaging.instance.requestPermission();
-      final token = await FirebaseMessaging.instance.getToken();
-      if (token != null) {
-        await _db.collection('users').doc(uid).set({'fcm_token': token}, SetOptions(merge: true));
-      }
-    } catch (_) {
-      // Non-fatal — notification-only feature, shouldn't block app usage
-      // (e.g. permission denied, no Google Play Services on the device).
-    }
+    await NotificationService().requestPermissionAndSaveToken(uid);
   }
 
   /// Keeps the saved token current if Firebase rotates it. Returns the

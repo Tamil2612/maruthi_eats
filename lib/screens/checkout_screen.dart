@@ -1,6 +1,6 @@
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:cloud_functions/cloud_functions.dart';
-import 'package:razorpay_flutter/razorpay_flutter.dart';
+// import 'package:razorpay_flutter/razorpay_flutter.dart';
 import 'package:provider/provider.dart';
 import '../providers/cart_provider.dart';
 import '../providers/address_provider.dart';
@@ -25,7 +25,8 @@ class CheckoutScreen extends StatefulWidget {
 class _CheckoutScreenState extends State<CheckoutScreen> {
   PaymentChoice _payment = PaymentChoice.upi;
   bool _placing = false;
-  late final Razorpay _razorpay;
+  // Razorpay commented out for now:
+  // late final Razorpay _razorpay;
 
   // Set once place_order succeeds. If a later step (opening the Razorpay
   // session) fails and the user retries, we reuse this instead of calling
@@ -36,15 +37,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   @override
   void initState() {
     super.initState();
-    _razorpay = Razorpay()
-      ..on(Razorpay.EVENT_PAYMENT_SUCCESS, _onPaymentSuccess)
-      ..on(Razorpay.EVENT_PAYMENT_ERROR, _onPaymentError)
-      ..on(Razorpay.EVENT_EXTERNAL_WALLET, _onExternalWallet);
+    // Razorpay disabled for now:
+    // _razorpay = Razorpay()
+    //   ..on(Razorpay.EVENT_PAYMENT_SUCCESS, _onPaymentSuccess)
+    //   ..on(Razorpay.EVENT_PAYMENT_ERROR, _onPaymentError)
+    //   ..on(Razorpay.EVENT_EXTERNAL_WALLET, _onExternalWallet);
   }
 
   @override
   void dispose() {
-    _razorpay.clear();
+    // _razorpay.clear();
     super.dispose();
   }
 
@@ -173,7 +175,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     try {
       String orderId;
       if (_pendingOrderId != null) {
-        // Reuse the order from a previous attempt — see field comment.
         orderId = _pendingOrderId!;
       } else {
         final result = await FirebaseFunctions.instanceFor(region: _functionsRegion)
@@ -191,43 +192,22 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         _pendingOrderId = orderId;
       }
 
-      if (_payment == PaymentChoice.cod) {
-        _pendingOrderId = null;
-        cart.clear();
-        if (!context.mounted) return;
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => OrderSuccessScreen(orderId: orderId)),
-        );
-        return;
-      }
-
-      // UPI: open a Razorpay checkout session for the order just created.
-      // Cart is only cleared and _placing reset once a payment result
-      // comes back — see _onPaymentSuccess/_onPaymentError below — since
-      // we're now waiting on the user inside the Razorpay UI, not on
-      // anything awaited here.
-      final session = await FirebaseFunctions.instanceFor(region: _functionsRegion)
-          .httpsCallable('razorpay_create_order')
-          .call({'order_id': orderId});
-
-      _razorpay.open({
-        'key': session.data['key_id'],
-        'amount': session.data['amount'],
-        'order_id': session.data['razorpay_order_id'],
-        'name': 'Maruthi Eats',
-        'description': 'Order #${orderId.substring(0, 6).toUpperCase()}',
-      });
+      _pendingOrderId = null;
+      cart.clear();
+      if (!context.mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => OrderSuccessScreen(orderId: orderId)),
+      );
     } on FirebaseFunctionsException catch (e) {
-      // e.message carries the specific reason the backend rejected the
-      // order (e.g. "Coupon has expired", "Item no longer available")
-      // instead of a raw exception string.
+      debugPrint('FirebaseFunctionsException: code=${e.code}, message=${e.message}, details=${e.details}');
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message ?? 'Could not place order. Please try again.')),
+        SnackBar(content: Text(e.message ?? 'Server error during order placement.')),
       );
       setState(() => _placing = false);
     } catch (e) {
+      debugPrint('Order placement error: $e');
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Could not place order: $e')),
@@ -236,37 +216,31 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
   }
 
-  void _onPaymentSuccess(PaymentSuccessResponse response) {
-    // This confirms the Razorpay checkout UI reported success — the
-    // authoritative payment_status update still comes from
-    // razorpay_webhook (signature-verified server-side), not from here.
-    final orderId = _pendingOrderId;
-    _pendingOrderId = null;
-    if (mounted) setState(() => _placing = false);
-    if (orderId == null || !mounted) return;
-
-    context.read<CartProvider>().clear();
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => OrderSuccessScreen(orderId: orderId)),
-    );
-  }
-
-  void _onPaymentError(PaymentFailureResponse response) {
-    // The order document itself is left as-is (payment_status stays
-    // 'pending' unless razorpay_webhook has already marked it 'failed').
-    // _pendingOrderId is kept so retrying reuses the same order instead
-    // of creating a duplicate.
-    if (mounted) setState(() => _placing = false);
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Payment failed: ${response.message ?? 'Please try again.'}')),
-    );
-  }
-
-  void _onExternalWallet(ExternalWalletResponse response) {
-    if (mounted) setState(() => _placing = false);
-  }
+  // Razorpay Callbacks commented out for now:
+  // void _onPaymentSuccess(PaymentSuccessResponse response) {
+  //   final orderId = _pendingOrderId;
+  //   _pendingOrderId = null;
+  //   if (mounted) setState(() => _placing = false);
+  //   if (orderId == null || !mounted) return;
+  //
+  //   context.read<CartProvider>().clear();
+  //   Navigator.pushReplacement(
+  //     context,
+  //     MaterialPageRoute(builder: (_) => OrderSuccessScreen(orderId: orderId)),
+  //   );
+  // }
+  //
+  // void _onPaymentError(PaymentFailureResponse response) {
+  //   if (mounted) setState(() => _placing = false);
+  //   if (!mounted) return;
+  //   ScaffoldMessenger.of(context).showSnackBar(
+  //     SnackBar(content: Text('Payment failed: ${response.message ?? 'Please try again.'}')),
+  //   );
+  // }
+  //
+  // void _onExternalWallet(ExternalWalletResponse response) {
+  //   if (mounted) setState(() => _placing = false);
+  // }
 
   Widget _buildAddressSection(BuildContext context, AddressModel? selectedAddress, List<AddressModel> allAddresses) {
     if (allAddresses.isEmpty) {

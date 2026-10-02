@@ -7,6 +7,7 @@ import 'home_screen.dart';
 import 'order_history_screen.dart';
 import 'account_screen.dart';
 import '../services/auth_service.dart';
+import '../services/notification_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/cart_fab.dart';
 
@@ -30,16 +31,17 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   @override
   void initState() {
     super.initState();
-    // Registers this device for order-status push notifications — see
-    // AuthService.saveFcmToken and backend/functions/main.py's
-    // on_order_status_updated. Runs once per app session, right when the
-    // user is confirmed signed in with a completed profile (AuthGate only
-    // shows this screen at that point).
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid != null) {
-      final authService = AuthService();
-      authService.saveFcmToken(uid);
-      _tokenRefreshSubscription = authService.listenForTokenRefresh(uid);
+      final notificationService = NotificationService();
+      notificationService.requestPermissionAndSaveToken(uid);
+      _tokenRefreshSubscription = AuthService().listenForTokenRefresh(uid);
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          notificationService.initializeListeners(context);
+        }
+      });
     }
   }
 
