@@ -33,9 +33,17 @@ class OrderHistoryScreen extends StatelessWidget {
             return const Center(
                 child: CircularProgressIndicator(color: AppColors.maroon));
           }
+          // Unpaid / expired UPI orders are not real orders: never list them
+          // (the app would otherwise show them as "Order Placed").
           final orders = snapshot.data!.docs
+              .where((d) {
+            final status =
+            (d.data() as Map<String, dynamic>)['order_status'];
+            return status != 'pending_payment' &&
+                status != 'payment_expired';
+          })
               .map((d) => OrderModel.fromFirestore(
-                  d.id, d.data() as Map<String, dynamic>))
+              d.id, d.data() as Map<String, dynamic>))
               .toList();
 
           if (orders.isEmpty) {
@@ -134,7 +142,7 @@ class _OrderHistoryCardState extends State<_OrderHistoryCard> {
 
       // Filter out free items as they are added by addOffer logic
       final itemsToProcess =
-          widget.order.items.where((i) => i['is_free'] != true).toList();
+      widget.order.items.where((i) => i['is_free'] != true).toList();
 
       for (final itemData in itemsToProcess) {
         final itemId = itemData['item_id'] as String;
@@ -162,7 +170,7 @@ class _OrderHistoryCardState extends State<_OrderHistoryCard> {
           final offerDoc = await db.collection('offers').doc(offerDocId).get();
           if (offerDoc.exists) {
             final offer =
-                OfferModel.fromFirestore(offerDoc.id, offerDoc.data()!);
+            OfferModel.fromFirestore(offerDoc.id, offerDoc.data()!);
             final expired = offer.expiryDate != null &&
                 offer.expiryDate!.isBefore(DateTime.now());
 
@@ -253,7 +261,7 @@ class _OrderHistoryCardState extends State<_OrderHistoryCard> {
 
   Future<MenuItem?> _fetchMenuItem(String id) async {
     final doc =
-        await FirebaseFirestore.instance.collection('menu_items').doc(id).get();
+    await FirebaseFirestore.instance.collection('menu_items').doc(id).get();
     if (!doc.exists) return null;
     return MenuItem.fromFirestore(doc.id, doc.data()!);
   }
@@ -301,7 +309,7 @@ class _OrderHistoryCardState extends State<_OrderHistoryCard> {
                   ),
                   Container(
                     padding:
-                        EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+                    EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
                     decoration: BoxDecoration(
                       color: _getStatusColor().withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(8.r),
@@ -377,14 +385,14 @@ class _OrderHistoryCardState extends State<_OrderHistoryCard> {
                           ),
                           child: _reordering
                               ? SizedBox(
-                                  width: 14.r,
-                                  height: 14.r,
-                                  child: const CircularProgressIndicator(
-                                      strokeWidth: 2, color: AppColors.maroon))
+                              width: 14.r,
+                              height: 14.r,
+                              child: const CircularProgressIndicator(
+                                  strokeWidth: 2, color: AppColors.maroon))
                               : Text('Repeat Order',
-                                  style: TextStyle(
-                                      fontSize: 12.sp,
-                                      fontWeight: FontWeight.w700)),
+                              style: TextStyle(
+                                  fontSize: 12.sp,
+                                  fontWeight: FontWeight.w700)),
                         ),
                       8.horizontalSpace,
                       ElevatedButton(
@@ -396,15 +404,15 @@ class _OrderHistoryCardState extends State<_OrderHistoryCard> {
                         ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: widget.order.orderStatus ==
-                                      OrderStatus.delivered ||
-                                  widget.order.orderStatus ==
-                                      OrderStatus.cancelled
+                              OrderStatus.delivered ||
+                              widget.order.orderStatus ==
+                                  OrderStatus.cancelled
                               ? AppColors.maroon
                               : Colors.green,
                           foregroundColor: widget.order.orderStatus ==
-                                      OrderStatus.delivered ||
-                                  widget.order.orderStatus ==
-                                      OrderStatus.cancelled
+                              OrderStatus.delivered ||
+                              widget.order.orderStatus ==
+                                  OrderStatus.cancelled
                               ? AppColors.gold
                               : AppColors.white,
                           padding: EdgeInsets.symmetric(
@@ -415,8 +423,8 @@ class _OrderHistoryCardState extends State<_OrderHistoryCard> {
                         ),
                         child: Text(
                           (widget.order.orderStatus == OrderStatus.delivered ||
-                                  widget.order.orderStatus ==
-                                      OrderStatus.cancelled)
+                              widget.order.orderStatus ==
+                                  OrderStatus.cancelled)
                               ? 'Details'
                               : 'Track Now',
                           style: TextStyle(
