@@ -9,7 +9,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  cupertino_icons: ^1.0.9
+  cupertino_icons: ^2.0.0
 
   # Firebase
   firebase_core: ^4.15.0
@@ -33,7 +33,7 @@ dependencies:
   geocoding: ^5.0.0
   carousel_slider: ^5.1.2
   flutter_launcher_icons: ^0.14.4
-  cached_network_image: ^3.4.1
+  cached_network_image: ^4.0.3
   shimmer: ^4.0.0
   lottie: ^3.6.1
 

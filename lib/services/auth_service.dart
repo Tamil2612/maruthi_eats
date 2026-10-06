@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'notification_service.dart';
 import '../models/app_user.dart';
 import '../models/address_model.dart';
@@ -183,31 +184,14 @@ class AuthService {
     final user = _auth.currentUser;
     if (user == null) return;
 
-    final uid = user.uid;
+    // Call the server-side delete_account Cloud Function.
+    // The Admin SDK server function anonymizes historical orders (preserving restaurant
+    // accounting records), deletes addresses, deletes /users/{uid}, and deletes the Firebase Auth user.
+    await FirebaseFunctions.instanceFor(region: 'asia-south1')
+        .httpsCallable('delete_account')
+        .call();
 
-    // Delete dependent documents in batches to stay below Firestore's
-    // 500-operation batch limit.
-    await _deleteQuery(_db.collection('users').doc(uid).collection('addresses'));
-    await _deleteQuery(_db.collection('orders').where('customer_id', isEqualTo: uid));
-
-    // Delete the profile only after dependent data is gone.
-    await _db.collection('users').doc(uid).delete();
-
-    // Finally delete the authentication account.
-    await user.delete();
-  }
-
-  Future<void> _deleteQuery(Query<Map<String, dynamic>> query) async {
-    while (true) {
-      final snapshot = await query.limit(450).get();
-      if (snapshot.docs.isEmpty) return;
-
-      final batch = _db.batch();
-      for (final doc in snapshot.docs) {
-        batch.delete(doc.reference);
-      }
-      await batch.commit();
-    }
+    await _auth.signOut();
   }
 
   Future<void> signOut() => _auth.signOut();

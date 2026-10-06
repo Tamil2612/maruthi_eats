@@ -594,6 +594,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Widget _buildBillDetailsCard(CartProvider cart) {
+    const double minOrderValue = 150.0;
+    final bool meetsMinOrder = cart.subtotal >= minOrderValue;
+    final double shortfall = meetsMinOrder ? 0.0 : (minOrderValue - cart.subtotal);
+
     return Container(
       padding: EdgeInsets.all(16.r),
       decoration: BoxDecoration(
@@ -621,6 +625,54 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             cart.deliveryFee,
             isFreeDelivery: cart.deliveryFee == 0,
           ),
+          6.verticalSpace,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Minimum Order',
+                style: TextStyle(
+                  fontSize: 12.sp,
+                  color: AppColors.textDark.withValues(alpha: 0.6),
+                ),
+              ),
+              Text(
+                '₹${minOrderValue.toStringAsFixed(0)}',
+                style: TextStyle(
+                  fontSize: 12.sp,
+                  fontWeight: FontWeight.w600,
+                  color: meetsMinOrder ? AppColors.success : AppColors.error,
+                ),
+              ),
+            ],
+          ),
+          if (!meetsMinOrder) ...[
+            10.verticalSpace,
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+              decoration: BoxDecoration(
+                color: AppColors.error.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8.r),
+                border: Border.all(color: AppColors.error.withValues(alpha: 0.2)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: AppColors.error, size: 16.r),
+                  8.horizontalSpace,
+                  Expanded(
+                    child: Text(
+                      'Add ₹${shortfall.toStringAsFixed(0)} more to place your order.',
+                      style: TextStyle(
+                        color: AppColors.error,
+                        fontSize: 12.sp,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           8.verticalSpace,
           Divider(color: AppColors.textDark.withValues(alpha: 0.08)),
           8.verticalSpace,
@@ -712,6 +764,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Widget _buildBottomPayBar(CartProvider cart) {
+    const double minOrderValue = 150.0;
+    final bool canPlace = cart.subtotal >= minOrderValue;
+
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 16.h),
       decoration: BoxDecoration(
@@ -769,7 +824,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               child: SizedBox(
                 height: 52.h,
                 child: ElevatedButton(
-                  onPressed: _placing ? null : () => _placeOrder(context, cart),
+                  onPressed: (_placing || !canPlace) ? null : () => _placeOrder(context, cart),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.maroon,
                     foregroundColor: AppColors.gold,
@@ -867,32 +922,27 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       // 2b. UPI: the order stays "pending_payment" (invisible to the
       // restaurant) until the server verifies the payment. Nothing is
       // deleted on failure - the server expires unpaid orders by itself.
-      try {
-        final user = FirebaseAuth.instance.currentUser;
-        final session =
-            await functions.httpsCallable('razorpay_create_order').call({'order_id': orderId});
+      final user = FirebaseAuth.instance.currentUser;
+      final session =
+          await functions.httpsCallable('razorpay_create_order').call({'order_id': orderId});
 
-        final keyId = session.data['key_id'] as String;
-        final amount = session.data['amount'] as int;
-        final razorpayOrderId = session.data['razorpay_order_id'] as String;
+      final keyId = session.data['key_id'] as String;
+      final amount = session.data['amount'] as int;
+      final razorpayOrderId = session.data['razorpay_order_id'] as String;
 
-        _razorpay.open({
-          'key': keyId,
-          'amount': amount,
-          'order_id': razorpayOrderId,
-          'currency': 'INR',
-          'name': 'Maruthi Eats',
-          'description': 'Order #${orderId.substring(0, 6).toUpperCase()}',
-          'prefill': {
-            'contact': user?.phoneNumber ?? '',
-            'email': user?.email ?? '',
-          },
-          'timeout': 600, // seconds the customer has to finish paying
-        });
-      } catch (razorpayError) {
-        await _cleanupPendingOrder(orderId);
-        rethrow;
-      }
+      _razorpay.open({
+        'key': keyId,
+        'amount': amount,
+        'order_id': razorpayOrderId,
+        'currency': 'INR',
+        'name': 'Maruthi Eats',
+        'description': 'Order #${orderId.substring(0, 6).toUpperCase()}',
+        'prefill': {
+          'contact': user?.phoneNumber ?? '',
+          'email': user?.email ?? '',
+        },
+        'timeout': 600, // seconds the customer has to finish paying
+      });
     } on FirebaseFunctionsException catch (e) {
       debugPrint('FirebaseFunctionsException: code=${e.code}, message=${e.message}, details=${e.details}');
       if (!context.mounted) return;
@@ -907,19 +957,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         SnackBar(content: Text('Could not start payment: $e')),
       );
       setState(() => _placing = false);
-    }
-  }
-
-  Future<void> _cleanupPendingOrder(String? orderId) async {
-    final idToDelete = orderId ?? _pendingOrderId;
-    _pendingOrderId = null;
-    _pendingOrderChoice = null;
-    if (idToDelete != null) {
-      try {
-        await FirebaseFirestore.instance.collection('orders').doc(idToDelete).delete();
-      } catch (e) {
-        debugPrint('Error cleaning up unpaid pending order: $e');
-      }
     }
   }
 
@@ -991,14 +1028,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   /// Waits (max 20 s) for the server/webhook to flip the order to paid.
-  Future<bool> _waitUntilPaid(String orderId) async {
+  Future<bool> _waitUntilPaid(String orderId, {int timeoutSeconds = 20}) async {
     try {
       await FirebaseFirestore.instance
           .collection('orders')
           .doc(orderId)
           .snapshots()
           .firstWhere((s) => s.data()?['payment_status'] == 'paid')
-          .timeout(const Duration(seconds: 20));
+          .timeout(Duration(seconds: timeoutSeconds));
       return true;
     } catch (_) {
       return false;
@@ -1006,8 +1043,23 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   void _onPaymentError(PaymentFailureResponse response) async {
-    final failedOrderId = _pendingOrderId;
-    await _cleanupPendingOrder(failedOrderId);
+    final orderId = _pendingOrderId;
+
+    // Check once more (short 3s wait) if the webhook or server confirmed payment in the background
+    if (orderId != null) {
+      final paid = await _waitUntilPaid(orderId, timeoutSeconds: 3);
+      if (paid && mounted) {
+        _pendingOrderId = null;
+        _pendingOrderChoice = null;
+        setState(() => _placing = false);
+        context.read<CartProvider>().clear();
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => OrderSuccessScreen(orderId: orderId)),
+        );
+        return;
+      }
+    }
 
     if (!mounted) return;
     setState(() => _placing = false);

@@ -193,7 +193,7 @@ class _OrderSummaryHeader extends StatelessWidget {
                   color: AppColors.gold.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(20.r),
                   border:
-                      Border.all(color: AppColors.gold.withValues(alpha: 0.4)),
+                  Border.all(color: AppColors.gold.withValues(alpha: 0.4)),
                 ),
                 child: Text('#${order.id.substring(0, 6).toUpperCase()}',
                     style: TextStyle(
@@ -461,7 +461,7 @@ class _HelpSection extends StatelessWidget {
           padding: EdgeInsets.symmetric(vertical: 12.h, horizontal: 16.w),
           backgroundColor: AppColors.maroon.withValues(alpha: 0.05),
           shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
         ),
       ),
     );
@@ -491,7 +491,7 @@ class _CancelledOrderView extends StatelessWidget {
               shape: BoxShape.circle,
             ),
             child:
-                Icon(Icons.close_rounded, color: AppColors.error, size: 44.r),
+            Icon(Icons.close_rounded, color: AppColors.error, size: 44.r),
           ),
           20.verticalSpace,
           Text('Order Cancelled',
@@ -506,6 +506,12 @@ class _CancelledOrderView extends StatelessWidget {
                 color: AppColors.textDark.withValues(alpha: 0.55),
                 fontSize: 13.sp),
           ),
+          // Paid online? Tell the customer where their money is.
+          if (order.paymentMode == 'upi' &&
+              (order.refundStatus != null || order.paymentStatus == 'paid')) ...[
+            20.verticalSpace,
+            _RefundStatusCard(order: order),
+          ],
           28.verticalSpace,
           _SectionCard(
             child: Column(
@@ -526,6 +532,78 @@ class _CancelledOrderView extends StatelessWidget {
             child: ElevatedButton(
               onPressed: () => Navigator.of(context).popUntil((r) => r.isFirst),
               child: const Text('Back to Menu'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// REFUND STATUS (shown on a cancelled, already-paid UPI order)
+// ─────────────────────────────────────────────────────────────
+
+class _RefundStatusCard extends StatelessWidget {
+  final OrderModel order;
+
+  const _RefundStatusCard({required this.order});
+
+  @override
+  Widget build(BuildContext context) {
+    final value = order.refundAmount ?? order.total;
+    final amount =
+        '₹${value.toStringAsFixed(value == value.roundToDouble() ? 0 : 2)}';
+
+    final processed = order.refundStatus == 'processed';
+    final failed = order.refundStatus == 'failed';
+
+    final color = processed ? AppColors.success : AppColors.info;
+    final icon = processed ? Icons.check_circle_rounded : Icons.autorenew_rounded;
+    final title = processed ? 'Refund processed' : 'Refund initiated';
+    final message = processed
+        ? '$amount has been sent back to your UPI account.'
+        : failed
+        ? 'We are processing your refund of $amount. If you do not receive '
+        'it within 24 hours, please contact the restaurant.'
+        : '$amount is on its way back to you. UPI refunds usually arrive '
+        'within minutes; otherwise it can take 5–7 working days.';
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(14.w),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(14.r),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color, size: 24.r),
+          12.horizontalSpace,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 14.sp,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                4.verticalSpace,
+                Text(
+                  message,
+                  style: TextStyle(
+                    color: AppColors.textDark.withValues(alpha: 0.75),
+                    fontSize: 12.5.sp,
+                    height: 1.35,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -583,7 +661,7 @@ class _DeliveredOrderViewState extends State<_DeliveredOrderView> {
               ],
             ),
             child:
-                Icon(Icons.check_rounded, color: AppColors.white, size: 52.r),
+            Icon(Icons.check_rounded, color: AppColors.white, size: 52.r),
           ),
           20.verticalSpace,
           Text('Delivered!',
@@ -652,11 +730,11 @@ class _DeliveredOrderViewState extends State<_DeliveredOrderView> {
                           : () => _submitRating(order.id),
                       child: _submittingRating
                           ? SizedBox(
-                              height: 18.r,
-                              width: 18.r,
-                              child: const CircularProgressIndicator(
-                                  strokeWidth: 2, color: AppColors.textDark),
-                            )
+                        height: 18.r,
+                        width: 18.r,
+                        child: const CircularProgressIndicator(
+                            strokeWidth: 2, color: AppColors.textDark),
+                      )
                           : const Text('Submit Rating'),
                     ),
                   ),

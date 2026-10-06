@@ -16,7 +16,10 @@ class CouponsScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Available Coupons')),
       body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance.collection('coupons').snapshots(),
+        stream: FirebaseFirestore.instance
+            .collection('coupons')
+            .where('is_active', isEqualTo: true)
+            .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.hasError) return const Center(child: Text('Error loading coupons'));
           if (!snapshot.hasData) return const Center(child: CircularProgressIndicator(color: AppColors.maroon));

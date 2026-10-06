@@ -6,6 +6,9 @@ import '../theme/app_theme.dart';
 import '../widgets/live_order_tracker.dart';
 import '../widgets/skeleton_loaders.dart';
 import '../widgets/offer_details_sheet.dart';
+import '../widgets/restaurant_status_banner.dart';
+import '../services/restaurant_service.dart';
+import '../models/restaurant_settings.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'full_menu_screen.dart';
 import '../models/offer.dart';
@@ -40,7 +43,14 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                16.verticalSpace,
+                StreamBuilder<RestaurantSettings>(
+                  stream: RestaurantService().streamSettings(),
+                  builder: (context, snapshot) {
+                    final settings = snapshot.data ?? RestaurantSettings.defaultSettings();
+                    return RestaurantStatusBanner(settings: settings);
+                  },
+                ),
+                8.verticalSpace,
                 // Banner Carousel
                 _buildBannerCarousel(),
 

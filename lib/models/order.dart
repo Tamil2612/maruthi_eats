@@ -48,6 +48,10 @@ class OrderModel {
   final double couponDiscount;
   final String paymentMode; // 'upi' | 'cod'
   final String paymentStatus;
+  // Set by the backend when a paid UPI order is cancelled:
+  // 'pending' | 'processed' | 'failed' | 'retry_requested' (null = no refund)
+  final String? refundStatus;
+  final double? refundAmount;
   final OrderStatus orderStatus;
   final String deliveryAddress;
   final String? addressLabel;
@@ -65,6 +69,8 @@ class OrderModel {
     this.couponDiscount = 0.0,
     required this.paymentMode,
     required this.paymentStatus,
+    this.refundStatus,
+    this.refundAmount,
     required this.orderStatus,
     required this.deliveryAddress,
     this.addressLabel,
@@ -84,6 +90,8 @@ class OrderModel {
       couponDiscount: (data['coupon_discount'] ?? 0.0).toDouble(),
       paymentMode: data['payment_mode'] ?? 'cod',
       paymentStatus: data['payment_status'] ?? 'pending',
+      refundStatus: data['refund_status'] as String?,
+      refundAmount: (data['refund_amount'] as num?)?.toDouble(),
       orderStatus: orderStatusFromString(data['order_status'] ?? 'placed'),
       deliveryAddress: data['delivery_address'] ?? '',
       addressLabel: data['address_label'],
