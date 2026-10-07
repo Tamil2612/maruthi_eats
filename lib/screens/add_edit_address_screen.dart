@@ -9,20 +9,9 @@ import '../models/address_model.dart';
 import '../models/restaurant_settings.dart';
 import '../services/auth_service.dart';
 import '../services/restaurant_service.dart';
+import '../services/location_search_service.dart';
 import '../theme/app_theme.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-
-class LocationSuggestion {
-  final String title;
-  final String subtitle;
-  final LatLng location;
-
-  LocationSuggestion({
-    required this.title,
-    required this.subtitle,
-    required this.location,
-  });
-}
 
 class AddEditAddressScreen extends StatefulWidget {
   final AddressModel? address;
@@ -54,6 +43,8 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
   bool _isSearching = false;
   bool _hasNoResults = false;
   int _searchQueryId = 0;
+  String? _sessionToken;
+  String _lastSearchQuery = '';
 
   Timer? _debounceTimer;
   List<LocationSuggestion> _suggestions = [];
@@ -144,12 +135,21 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
     _debounceTimer?.cancel();
     final search = query.trim();
 
-    if (search.length < 3) {
+    if (search.length < 2) {
       setState(() {
         _suggestions = [];
         _hasNoResults = false;
         _isSearching = false;
       });
+      _sessionToken = null;
+      _lastSearchQuery = '';
+      return;
+    }
+
+    // Initialize session token when beginning a new autocomplete session
+    _sessionToken ??= LocationSearchService.generateSessionToken();
+
+    if (search == _lastSearchQuery && _suggestions.isNotEmpty) {
       return;
     }
 
@@ -159,53 +159,24 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
   }
 
   Future<void> _fetchLocationSuggestions(String query) async {
-    if (kIsWeb || query.length < 3) return;
+    final search = query.trim();
+    if (search.length < 2) return;
 
     final currentQueryId = ++_searchQueryId;
+    _lastSearchQuery = search;
+
     setState(() {
       _isSearching = true;
       _hasNoResults = false;
     });
 
     try {
-      List<Location> locations = await Geocoding().locationFromAddress(query);
+      final results = await LocationSearchService.fetchSuggestions(
+        search,
+        sessionToken: _sessionToken,
+        locationBias: _selectedLocation,
+      );
       if (currentQueryId != _searchQueryId) return;
-
-      List<LocationSuggestion> results = [];
-      for (var loc in locations.take(5)) {
-        if (currentQueryId != _searchQueryId) return;
-        try {
-          List<Placemark> placemarks = await Geocoding()
-              .placemarkFromCoordinates(loc.latitude, loc.longitude);
-          if (currentQueryId != _searchQueryId) return;
-
-          if (placemarks.isNotEmpty) {
-            final p = placemarks.first;
-            final title = [p.name, p.subLocality]
-                .where((s) =>
-                    s != null && s.isNotEmpty && s.toLowerCase() != "null")
-                .join(", ");
-
-            final subtitle = [p.locality, p.administrativeArea, p.country]
-                .where((s) =>
-                    s != null && s.isNotEmpty && s.toLowerCase() != "null")
-                .join(", ");
-
-            results.add(LocationSuggestion(
-              title: title.isNotEmpty ? title : (p.locality ?? "Location"),
-              subtitle: subtitle,
-              location: LatLng(loc.latitude, loc.longitude),
-            ));
-          }
-        } catch (_) {
-          results.add(LocationSuggestion(
-            title: query,
-            subtitle:
-                "${loc.latitude.toStringAsFixed(4)}, ${loc.longitude.toStringAsFixed(4)}",
-            location: LatLng(loc.latitude, loc.longitude),
-          ));
-        }
-      }
 
       if (mounted && currentQueryId == _searchQueryId) {
         setState(() {
@@ -214,7 +185,6 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
         });
       }
     } catch (e) {
-      debugPrint("Error fetching suggestions: $e");
       if (mounted && currentQueryId == _searchQueryId) {
         setState(() {
           _suggestions = [];
@@ -228,15 +198,53 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
     }
   }
 
-  void _selectSuggestion(LocationSuggestion suggestion) {
+  void _selectSuggestion(LocationSuggestion suggestion) async {
     FocusScope.of(context).unfocus();
+
+    final activeSessionToken = _sessionToken;
+    // End search session after selection
+    _sessionToken = null;
+    _lastSearchQuery = '';
+
     setState(() {
       _suggestions = [];
       _hasNoResults = false;
       _searchController.text =
           suggestion.title.isNotEmpty ? suggestion.title : suggestion.subtitle;
     });
-    _updateLocation(suggestion.location);
+
+    if (suggestion.placeId != null && suggestion.placeId!.isNotEmpty) {
+      setState(() => _isSearching = true);
+      final placeDetails = await LocationSearchService.getPlaceDetails(
+        suggestion.placeId!,
+        sessionToken: activeSessionToken,
+      );
+      if (mounted) setState(() => _isSearching = false);
+
+      if (placeDetails != null) {
+        if (mounted) {
+          setState(() {
+            final displayText = placeDetails.displayName.isNotEmpty
+                ? placeDetails.displayName
+                : (suggestion.title.isNotEmpty
+                    ? suggestion.title
+                    : placeDetails.formattedAddress);
+            _searchController.text = displayText;
+            if (placeDetails.formattedAddress.isNotEmpty) {
+              _streetController.text = placeDetails.formattedAddress;
+            }
+          });
+          _updateLocation(placeDetails.location, updateStreetAddress: false);
+        }
+        return;
+      }
+    }
+
+    // Fallback if Place Details fails or placeId is missing
+    final latLng = await LocationSearchService.resolveLocation(suggestion);
+    if (latLng != null && mounted) {
+      _updateLocation(latLng);
+    }
   }
 
   void _onCameraIdle() {
@@ -254,7 +262,8 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
     _updateLocation(_selectedLocation);
   }
 
-  void _updateLocation(LatLng location) async {
+  void _updateLocation(LatLng location,
+      {bool updateStreetAddress = true}) async {
     if (!mounted) return;
     setState(() {
       _selectedLocation = location;
@@ -262,6 +271,8 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
       _lastGeocodedLng = location.longitude;
     });
     _mapController?.animateCamera(CameraUpdate.newLatLngZoom(location, 16));
+
+    if (!updateStreetAddress) return;
 
     try {
       if (!kIsWeb) {
@@ -294,7 +305,8 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
   double? get _distanceToRestaurantKm {
     if (_restaurantSettings == null) return null;
     final del = _restaurantSettings!.delivery;
-    if (del.restaurantLatitude == 0.0 && del.restaurantLongitude == 0.0) return null;
+    if (del.restaurantLatitude == 0.0 && del.restaurantLongitude == 0.0)
+      return null;
 
     final meters = Geolocator.distanceBetween(
       del.restaurantLatitude,
@@ -326,7 +338,8 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
   @override
   Widget build(BuildContext context) {
     final distKm = _distanceToRestaurantKm;
-    final maxDistKm = _restaurantSettings?.delivery.maxDeliveryDistanceKm ?? 8.0;
+    final maxDistKm =
+        _restaurantSettings?.delivery.maxDeliveryDistanceKm ?? 8.0;
     final outsideArea = _isOutsideDeliveryArea;
 
     return Scaffold(
@@ -377,7 +390,9 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
                               padding: EdgeInsets.symmetric(
                                   horizontal: 10.w, vertical: 4.h),
                               decoration: BoxDecoration(
-                                color: outsideArea ? AppColors.error : AppColors.textDark,
+                                color: outsideArea
+                                    ? AppColors.error
+                                    : AppColors.textDark,
                                 borderRadius: BorderRadius.circular(8.r),
                               ),
                               child: Text(
@@ -394,7 +409,9 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
                             4.verticalSpace,
                             Icon(
                               Icons.location_on_rounded,
-                              color: outsideArea ? AppColors.error : AppColors.maroon,
+                              color: outsideArea
+                                  ? AppColors.error
+                                  : AppColors.maroon,
                               size: 42.r,
                             ),
                           ],
@@ -469,7 +486,10 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
                                       setState(() {
                                         _suggestions = [];
                                         _hasNoResults = false;
+                                        _isSearching = false;
                                       });
+                                      _sessionToken = null;
+                                      _lastSearchQuery = '';
                                     },
                                   ),
                               ],
@@ -487,9 +507,13 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
                               ),
                               child: Row(
                                 children: [
-                                  Icon(Icons.search_off_rounded, color: AppColors.grey, size: 18.r),
+                                  Icon(Icons.search_off_rounded,
+                                      color: AppColors.grey, size: 18.r),
                                   8.horizontalSpace,
-                                  Text('No places found', style: TextStyle(fontSize: 12.sp, color: AppColors.grey)),
+                                  Text('No places found',
+                                      style: TextStyle(
+                                          fontSize: 12.sp,
+                                          color: AppColors.grey)),
                                 ],
                               ),
                             ),
@@ -623,15 +647,19 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
                       children: [
                         if (outsideArea && distKm != null) ...[
                           Container(
-                            padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
+                            padding: EdgeInsets.symmetric(
+                                horizontal: 14.w, vertical: 10.h),
                             decoration: BoxDecoration(
                               color: AppColors.error.withValues(alpha: 0.08),
                               borderRadius: BorderRadius.circular(12.r),
-                              border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
+                              border: Border.all(
+                                  color:
+                                      AppColors.error.withValues(alpha: 0.3)),
                             ),
                             child: Row(
                               children: [
-                                Icon(Icons.error_outline, color: AppColors.error, size: 20.r),
+                                Icon(Icons.error_outline,
+                                    color: AppColors.error, size: 20.r),
                                 10.horizontalSpace,
                                 Expanded(
                                   child: Text(
@@ -754,7 +782,9 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
                             ),
                           )
                         : Text(
-                            outsideArea ? 'LOCATION OUTSIDE DELIVERY AREA' : 'SAVE ADDRESS',
+                            outsideArea
+                                ? 'LOCATION OUTSIDE DELIVERY AREA'
+                                : 'SAVE ADDRESS',
                             style: TextStyle(
                               fontSize: 13.sp,
                               fontWeight: FontWeight.bold,
@@ -862,7 +892,8 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
     if (name.isEmpty || phone.isEmpty || flatNo.isEmpty || street.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('Please fill in Flat/House No., street address, and contact details')),
+            content: Text(
+                'Please fill in Flat/House No., street address, and contact details')),
       );
       return;
     }

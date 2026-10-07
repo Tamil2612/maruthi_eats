@@ -1085,9 +1085,97 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     setState(() => _placing = true);
 
     try {
-      final functions = FirebaseFunctions.instanceFor(region: _functionsRegion);
+      // 1. Get server preview & validate BEFORE creating the order
+      final preview = await CheckoutService.getCheckoutPreview(
+        latitude: selectedAddress.latitude,
+        longitude: selectedAddress.longitude,
+        subtotal: cart.subtotal,
+      );
 
-      // 1. Create the order on the server (priced server-side).
+      if (!preview.isAvailable) {
+        if (!context.mounted) return;
+        setState(() => _placing = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(preview.statusMessage.isNotEmpty
+                ? preview.statusMessage
+                : 'Restaurant is currently unavailable.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+        return;
+      }
+
+      if (!preview.isDeliverable) {
+        if (!context.mounted) return;
+        setState(() => _placing = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(preview.deliveryMessage.isNotEmpty
+                ? preview.deliveryMessage
+                : 'Address is outside our delivery area.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+        return;
+      }
+
+      if (!preview.meetsMinimumOrder) {
+        if (!context.mounted) return;
+        setState(() => _placing = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(preview.minimumOrderMessage.isNotEmpty
+                ? preview.minimumOrderMessage
+                : 'Minimum order value requirement not met.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+        return;
+      }
+
+      cart.setPreviewResult(
+        deliveryFee: preview.deliveryFee,
+        minimumOrderValue: preview.minimumOrderValue,
+        failed: false,
+      );
+
+      final calculatedServerTotal = (cart.subtotal - cart.couponDiscount) + preview.deliveryFee;
+      final currentShownTotal = cart.totalPayable;
+
+      // Price update confirmation BEFORE order creation
+      if ((calculatedServerTotal - currentShownTotal).abs() > 0.50) {
+        if (!context.mounted) return;
+        final confirm = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Order Total Updated'),
+            content: Text(
+              'The final order total from the server is ₹${calculatedServerTotal.toStringAsFixed(0)} '
+              '(Delivery Fee: ₹${preview.deliveryFee.toStringAsFixed(0)}).\n\n'
+              'Do you want to proceed?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Continue'),
+              ),
+            ],
+          ),
+        );
+
+        if (confirm != true) {
+          setState(() => _placing = false);
+          return;
+        }
+      }
+
+      // 2. Place order on the server (authoritative creation)
+      final functions = FirebaseFunctions.instanceFor(region: _functionsRegion);
       String orderId;
       if (_pendingOrderId != null && _pendingOrderChoice == _payment) {
         orderId = _pendingOrderId!;
@@ -1101,40 +1189,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           'latitude': selectedAddress.latitude,
           'longitude': selectedAddress.longitude,
         });
-
-        final serverTotal = (result.data['total'] as num).toDouble();
-        final shownTotal = cart.totalPayable;
-
-        // Safety net: compare server total with displayed total
-        if ((serverTotal - shownTotal).abs() > 0.50) {
-          if (!context.mounted) return;
-          final confirm = await showDialog<bool>(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              title: const Text('Order Total Updated'),
-              content: Text(
-                'The final order total from the server is ₹${serverTotal.toStringAsFixed(0)} '
-                '(Delivery Fee: ₹${((result.data['delivery_fee'] ?? cart.deliveryFee) as num).toStringAsFixed(0)}).\n\n'
-                'Do you want to proceed?',
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx, false),
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: () => Navigator.pop(ctx, true),
-                  child: const Text('Continue'),
-                ),
-              ],
-            ),
-          );
-
-          if (confirm != true) {
-            setState(() => _placing = false);
-            return;
-          }
-        }
 
         orderId = result.data['order_id'] as String;
         _pendingOrderId = orderId;
