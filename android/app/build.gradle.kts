@@ -8,7 +8,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.maruthi_eats"
+    namespace = "com.maruthieats.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -19,17 +19,23 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.maruthi_eats"
+        applicationId = "com.maruthieats.app"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-        // Supply with -PMAPS_API_KEY=... in local/CI Gradle configuration.
-        // Do not commit a Maps API key in the manifest.
-        manifestPlaceholders["MAPS_API_KEY"] =
-            providers.gradleProperty("MAPS_API_KEY").orElse("").get()
+
+        val localProperties = java.util.Properties()
+        val localPropertiesFile = rootProject.file("local.properties")
+        if (localPropertiesFile.exists()) {
+            localPropertiesFile.inputStream().use { localProperties.load(it) }
+        }
+        val mapsApiKey = localProperties.getProperty("MAPS_API_KEY")
+            ?: providers.gradleProperty("MAPS_API_KEY").orElse("").get()
+
+        manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
     }
 
     buildTypes {
@@ -53,4 +59,6 @@ flutter {
 
 dependencies {
     implementation("androidx.appcompat:appcompat:1.4.0")
+    implementation(platform("com.google.firebase:firebase-bom:34.19.0"))
+    implementation("com.google.firebase:firebase-analytics")
 }

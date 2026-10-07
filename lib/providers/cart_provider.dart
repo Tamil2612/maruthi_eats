@@ -21,7 +21,32 @@ class CartProvider extends ChangeNotifier {
     return _appliedCoupon!.amount;
   }
 
-  double get deliveryFee => isEmpty ? 0.0 : 30.0;
+  double _serverDeliveryFee = 30.0;
+  double _serverMinOrderValue = 150.0;
+  bool _previewFailed = false;
+
+  double get deliveryFee => isEmpty ? 0.0 : _serverDeliveryFee;
+  double get minimumOrderValue => _serverMinOrderValue;
+  bool get previewFailed => _previewFailed;
+
+  void setPreviewResult({
+    required double deliveryFee,
+    required double minimumOrderValue,
+    bool failed = false,
+  }) {
+    _serverDeliveryFee = deliveryFee;
+    _serverMinOrderValue = minimumOrderValue;
+    _previewFailed = failed;
+    notifyListeners();
+  }
+
+  void setDeliveryFee(double fee) {
+    if (_serverDeliveryFee != fee) {
+      _serverDeliveryFee = fee;
+      notifyListeners();
+    }
+  }
+
   double get totalPayable {
     final payable = (subtotal - couponDiscount) + deliveryFee;
     return payable < 0 ? 0.0 : payable;

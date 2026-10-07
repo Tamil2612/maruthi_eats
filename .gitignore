@@ -11,6 +11,10 @@
 .svn/
 .swiftpm/
 migrate_working_dir/
+.agents/
+.claude/
+.junie/
+.firebase/
 
 # IntelliJ related
 *.iml

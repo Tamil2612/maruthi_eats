@@ -337,7 +337,36 @@ class _BillDetails extends StatelessWidget {
         _billRow('Item Total', cart.subtotal),
         if (cart.couponDiscount > 0)
           _billRow('Coupon Discount', -cart.couponDiscount, isDiscount: true),
-        _billRow('Delivery Partner Fee', cart.deliveryFee, isInfo: true),
+        Padding(
+          padding: EdgeInsets.symmetric(vertical: 4.h),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    'Delivery Fee',
+                    style: TextStyle(
+                      fontSize: 12.sp,
+                      color: AppColors.textDark.withValues(alpha: 0.6),
+                    ),
+                  ),
+                  4.horizontalSpace,
+                  Icon(Icons.info_outline, size: 12.r, color: AppColors.textDark.withValues(alpha: 0.4)),
+                ],
+              ),
+              Text(
+                'Calculated at checkout',
+                style: TextStyle(
+                  fontSize: 12.sp,
+                  color: AppColors.maroon,
+                  fontWeight: FontWeight.w600,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ],
+          ),
+        ),
         12.verticalSpace,
         const Divider(thickness: 1.5),
         12.verticalSpace,

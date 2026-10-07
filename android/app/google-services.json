@@ -23,6 +23,44 @@
           "other_platform_oauth_client": []
         }
       }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:119948554671:android:e1b3dbb30f28e1f7b23f5a",
+        "android_client_info": {
+          "package_name": "com.example.maruthi_eats_admin"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAlnBDuqrG9DiwdarS2H2iZXhr2IzAq1bM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:119948554671:android:6dfdd7de5e34ce23b23f5a",
+        "android_client_info": {
+          "package_name": "com.maruthieats.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAlnBDuqrG9DiwdarS2H2iZXhr2IzAq1bM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
     }
   ],
   "configuration_version": "1"

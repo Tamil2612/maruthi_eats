@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import '../models/app_user.dart';
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
@@ -186,10 +187,22 @@ class AccountScreen extends StatelessWidget {
               try {
                 await authService.deleteAccount();
                 // Navigation to splash/login will be handled by the auth state stream in main.dart
+              } on FirebaseFunctionsException catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(e.message ?? 'Could not delete account.'),
+                      backgroundColor: AppColors.error,
+                    ),
+                  );
+                }
               } catch (e) {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Could not delete account. You may need to log in again first.')),
+                    const SnackBar(
+                      content: Text('Could not delete account. Please try again.'),
+                      backgroundColor: AppColors.error,
+                    ),
                   );
                 }
               }

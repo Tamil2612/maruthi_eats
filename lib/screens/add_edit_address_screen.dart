@@ -6,7 +6,9 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import '../models/address_model.dart';
+import '../models/restaurant_settings.dart';
 import '../services/auth_service.dart';
+import '../services/restaurant_service.dart';
 import '../theme/app_theme.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
@@ -35,9 +37,13 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
   GoogleMapController? _mapController;
   LatLng _selectedLocation = const LatLng(13.0827, 80.2707); // Default Chennai
 
+  double? _lastGeocodedLat;
+  double? _lastGeocodedLng;
+
   final _searchController = TextEditingController();
+  final _flatNoController = TextEditingController();
+  final _streetController = TextEditingController();
   final _labelController = TextEditingController();
-  final _addressController = TextEditingController();
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _authService = AuthService();
@@ -46,17 +52,34 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
   bool _saving = false;
   bool _isLoadingLocation = false;
   bool _isSearching = false;
+  bool _hasNoResults = false;
+  int _searchQueryId = 0;
 
   Timer? _debounceTimer;
   List<LocationSuggestion> _suggestions = [];
+  RestaurantSettings? _restaurantSettings;
 
   @override
   void initState() {
     super.initState();
+    _loadRestaurantSettings();
+
     if (widget.address != null) {
       _selectedLocation =
           LatLng(widget.address!.latitude, widget.address!.longitude);
-      _addressController.text = widget.address!.fullAddress;
+      _lastGeocodedLat = widget.address!.latitude;
+      _lastGeocodedLng = widget.address!.longitude;
+
+      final full = widget.address!.fullAddress;
+      final commaIndex = full.indexOf(',');
+      if (commaIndex != -1) {
+        _flatNoController.text = full.substring(0, commaIndex).trim();
+        _streetController.text = full.substring(commaIndex + 1).trim();
+      } else {
+        _flatNoController.text = '';
+        _streetController.text = full.trim();
+      }
+
       _nameController.text = widget.address!.recipientName;
       _phoneController.text = widget.address!.recipientPhone;
 
@@ -71,6 +94,17 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
       _loadUserDetails();
       _getCurrentLocation();
     }
+  }
+
+  Future<void> _loadRestaurantSettings() async {
+    try {
+      final settings = await RestaurantService().getSettings();
+      if (mounted) {
+        setState(() {
+          _restaurantSettings = settings;
+        });
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadUserDetails() async {
@@ -110,9 +144,10 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
     _debounceTimer?.cancel();
     final search = query.trim();
 
-    if (search.isEmpty) {
+    if (search.length < 3) {
       setState(() {
         _suggestions = [];
+        _hasNoResults = false;
         _isSearching = false;
       });
       return;
@@ -124,17 +159,26 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
   }
 
   Future<void> _fetchLocationSuggestions(String query) async {
-    if (kIsWeb || query.isEmpty) return;
+    if (kIsWeb || query.length < 3) return;
 
-    setState(() => _isSearching = true);
+    final currentQueryId = ++_searchQueryId;
+    setState(() {
+      _isSearching = true;
+      _hasNoResults = false;
+    });
+
     try {
       List<Location> locations = await Geocoding().locationFromAddress(query);
-      List<LocationSuggestion> results = [];
+      if (currentQueryId != _searchQueryId) return;
 
+      List<LocationSuggestion> results = [];
       for (var loc in locations.take(5)) {
+        if (currentQueryId != _searchQueryId) return;
         try {
           List<Placemark> placemarks = await Geocoding()
               .placemarkFromCoordinates(loc.latitude, loc.longitude);
+          if (currentQueryId != _searchQueryId) return;
+
           if (placemarks.isNotEmpty) {
             final p = placemarks.first;
             final title = [p.name, p.subLocality]
@@ -163,20 +207,22 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
         }
       }
 
-      if (mounted) {
+      if (mounted && currentQueryId == _searchQueryId) {
         setState(() {
           _suggestions = results;
+          _hasNoResults = results.isEmpty;
         });
       }
     } catch (e) {
       debugPrint("Error fetching suggestions: $e");
-      if (mounted) {
+      if (mounted && currentQueryId == _searchQueryId) {
         setState(() {
           _suggestions = [];
+          _hasNoResults = true;
         });
       }
     } finally {
-      if (mounted) {
+      if (mounted && currentQueryId == _searchQueryId) {
         setState(() => _isSearching = false);
       }
     }
@@ -186,16 +232,34 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
     FocusScope.of(context).unfocus();
     setState(() {
       _suggestions = [];
+      _hasNoResults = false;
       _searchController.text =
           suggestion.title.isNotEmpty ? suggestion.title : suggestion.subtitle;
     });
     _updateLocation(suggestion.location);
   }
 
+  void _onCameraIdle() {
+    if (_lastGeocodedLat != null && _lastGeocodedLng != null) {
+      final meters = Geolocator.distanceBetween(
+        _lastGeocodedLat!,
+        _lastGeocodedLng!,
+        _selectedLocation.latitude,
+        _selectedLocation.longitude,
+      );
+      if (meters < 20.0) {
+        return; // Pin didn't move more than 20 meters, skip reverse geocoding
+      }
+    }
+    _updateLocation(_selectedLocation);
+  }
+
   void _updateLocation(LatLng location) async {
     if (!mounted) return;
     setState(() {
       _selectedLocation = location;
+      _lastGeocodedLat = location.latitude;
+      _lastGeocodedLng = location.longitude;
     });
     _mapController?.animateCamera(CameraUpdate.newLatLngZoom(location, 16));
 
@@ -218,7 +282,7 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
         final addr = components.join(", ");
         if (addr.isNotEmpty) {
           setState(() {
-            _addressController.text = addr;
+            _streetController.text = addr;
           });
         }
       }
@@ -227,12 +291,33 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
     }
   }
 
+  double? get _distanceToRestaurantKm {
+    if (_restaurantSettings == null) return null;
+    final del = _restaurantSettings!.delivery;
+    if (del.restaurantLatitude == 0.0 && del.restaurantLongitude == 0.0) return null;
+
+    final meters = Geolocator.distanceBetween(
+      del.restaurantLatitude,
+      del.restaurantLongitude,
+      _selectedLocation.latitude,
+      _selectedLocation.longitude,
+    );
+    return meters / 1000.0;
+  }
+
+  bool get _isOutsideDeliveryArea {
+    final dist = _distanceToRestaurantKm;
+    if (dist == null || _restaurantSettings == null) return false;
+    return dist > _restaurantSettings!.delivery.maxDeliveryDistanceKm;
+  }
+
   @override
   void dispose() {
     _debounceTimer?.cancel();
     _searchController.dispose();
+    _flatNoController.dispose();
+    _streetController.dispose();
     _labelController.dispose();
-    _addressController.dispose();
     _nameController.dispose();
     _phoneController.dispose();
     super.dispose();
@@ -240,6 +325,10 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final distKm = _distanceToRestaurantKm;
+    final maxDistKm = _restaurantSettings?.delivery.maxDeliveryDistanceKm ?? 8.0;
+    final outsideArea = _isOutsideDeliveryArea;
+
     return Scaffold(
       backgroundColor: AppColors.cream,
       appBar: AppBar(
@@ -271,7 +360,7 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
                       ),
                       onMapCreated: (c) => _mapController = c,
                       onCameraMove: (pos) => _selectedLocation = pos.target,
-                      onCameraIdle: () => _updateLocation(_selectedLocation),
+                      onCameraIdle: _onCameraIdle,
                       myLocationEnabled: true,
                       myLocationButtonEnabled: false,
                       zoomControlsEnabled: false,
@@ -288,11 +377,13 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
                               padding: EdgeInsets.symmetric(
                                   horizontal: 10.w, vertical: 4.h),
                               decoration: BoxDecoration(
-                                color: AppColors.textDark,
+                                color: outsideArea ? AppColors.error : AppColors.textDark,
                                 borderRadius: BorderRadius.circular(8.r),
                               ),
                               child: Text(
-                                'Order will be delivered here',
+                                outsideArea
+                                    ? 'Outside delivery area (${distKm?.toStringAsFixed(1)} km)'
+                                    : 'Order will be delivered here',
                                 style: TextStyle(
                                   color: AppColors.white,
                                   fontSize: 10.sp,
@@ -303,7 +394,7 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
                             4.verticalSpace,
                             Icon(
                               Icons.location_on_rounded,
-                              color: AppColors.maroon,
+                              color: outsideArea ? AppColors.error : AppColors.maroon,
                               size: 42.r,
                             ),
                           ],
@@ -377,6 +468,7 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
                                       _searchController.clear();
                                       setState(() {
                                         _suggestions = [];
+                                        _hasNoResults = false;
                                       });
                                     },
                                   ),
@@ -385,7 +477,23 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
                           ),
 
                           // Search Suggestions Dropdown List
-                          if (_suggestions.isNotEmpty) ...[
+                          if (_hasNoResults) ...[
+                            6.verticalSpace,
+                            Container(
+                              padding: EdgeInsets.all(14.r),
+                              decoration: BoxDecoration(
+                                color: AppColors.white,
+                                borderRadius: BorderRadius.circular(16.r),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.search_off_rounded, color: AppColors.grey, size: 18.r),
+                                  8.horizontalSpace,
+                                  Text('No places found', style: TextStyle(fontSize: 12.sp, color: AppColors.grey)),
+                                ],
+                              ),
+                            ),
+                          ] else if (_suggestions.isNotEmpty) ...[
                             6.verticalSpace,
                             Container(
                               constraints: BoxConstraints(maxHeight: 220.h),
@@ -513,6 +621,34 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        if (outsideArea && distKm != null) ...[
+                          Container(
+                            padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
+                            decoration: BoxDecoration(
+                              color: AppColors.error.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(12.r),
+                              border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.error_outline, color: AppColors.error, size: 20.r),
+                                10.horizontalSpace,
+                                Expanded(
+                                  child: Text(
+                                    'Outside delivery area (${distKm.toStringAsFixed(1)} km away, max is ${maxDistKm.toStringAsFixed(0)} km)',
+                                    style: TextStyle(
+                                      color: AppColors.error,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12.sp,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          16.verticalSpace,
+                        ],
+
                         _sectionTitle(
                             "Receiver's Contact", Icons.person_outline_rounded),
                         12.verticalSpace,
@@ -534,8 +670,14 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
                             "Address Details", Icons.location_on_outlined),
                         12.verticalSpace,
                         _buildTextField(
-                          controller: _addressController,
-                          label: "House / Flat No., Building & Street Address",
+                          controller: _flatNoController,
+                          label: "Flat / House No. / Building / Landmark *",
+                          icon: Icons.apartment_rounded,
+                        ),
+                        12.verticalSpace,
+                        _buildTextField(
+                          controller: _streetController,
+                          label: "Street / Area / Address (auto-filled)",
                           icon: Icons.location_city_rounded,
                           maxLines: 2,
                         ),
@@ -593,7 +735,7 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
                   width: double.infinity,
                   height: 52.h,
                   child: ElevatedButton(
-                    onPressed: _saving ? null : _save,
+                    onPressed: (_saving || outsideArea) ? null : _save,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.maroon,
                       foregroundColor: AppColors.gold,
@@ -612,9 +754,9 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
                             ),
                           )
                         : Text(
-                            'SAVE ADDRESS',
+                            outsideArea ? 'LOCATION OUTSIDE DELIVERY AREA' : 'SAVE ADDRESS',
                             style: TextStyle(
-                              fontSize: 14.sp,
+                              fontSize: 13.sp,
                               fontWeight: FontWeight.bold,
                               letterSpacing: 0.5,
                             ),
@@ -713,18 +855,21 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
   Future<void> _save() async {
     final name = _nameController.text.trim();
     final phone = _phoneController.text.trim();
-    final fullAddr = _addressController.text.trim();
+    final flatNo = _flatNoController.text.trim();
+    final street = _streetController.text.trim();
     final customLabel = _labelController.text.trim();
 
-    if (name.isEmpty || phone.isEmpty || fullAddr.isEmpty) {
+    if (name.isEmpty || phone.isEmpty || flatNo.isEmpty || street.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('Please fill in all contact and address details')),
+            content: Text('Please fill in Flat/House No., street address, and contact details')),
       );
       return;
     }
 
+    final fullAddr = '$flatNo, $street';
     final finalLabel = _selectedType == 'Other' ? customLabel : _selectedType;
+
     if (finalLabel.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter an address label')),

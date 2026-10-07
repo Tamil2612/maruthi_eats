@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -8,6 +9,7 @@ import 'package:razorpay_flutter/razorpay_flutter.dart';
 import 'package:provider/provider.dart';
 import '../providers/cart_provider.dart';
 import '../providers/address_provider.dart';
+import '../services/checkout_service.dart';
 import '../theme/app_theme.dart';
 import '../models/address_model.dart';
 import '../models/cart_item.dart';
@@ -34,6 +36,63 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   String? _pendingOrderId;
   PaymentChoice? _pendingOrderChoice;
 
+  Map<String, dynamic>? _previewData;
+  String? _lastPreviewAddressId;
+  double? _lastPreviewSubtotal;
+  Timer? _debounceTimer;
+
+  void _schedulePreviewFetch(AddressModel address, double subtotal) {
+    if (_lastPreviewAddressId == address.id && _lastPreviewSubtotal == subtotal) return;
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 300), () {
+      _fetchPreview(address, subtotal);
+    });
+  }
+
+  Future<void> _fetchPreview(AddressModel address, double subtotal) async {
+    _lastPreviewAddressId = address.id;
+    _lastPreviewSubtotal = subtotal;
+
+    try {
+      final preview = await CheckoutService.getCheckoutPreview(
+        latitude: address.latitude,
+        longitude: address.longitude,
+        subtotal: subtotal,
+      );
+
+      if (mounted) {
+        setState(() {
+          _previewData = {
+            'is_available': preview.isAvailable,
+            'status_code': preview.statusCode,
+            'status_message': preview.statusMessage,
+            'distance_km': preview.distanceKm,
+            'delivery_fee': preview.deliveryFee,
+            'is_deliverable': preview.isDeliverable,
+            'delivery_message': preview.deliveryMessage,
+            'minimum_order_value': preview.minimumOrderValue,
+            'meets_minimum_order': preview.meetsMinimumOrder,
+            'minimum_order_message': preview.minimumOrderMessage,
+          };
+        });
+
+        context.read<CartProvider>().setPreviewResult(
+          deliveryFee: preview.deliveryFee,
+          minimumOrderValue: preview.minimumOrderValue,
+          failed: false,
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        context.read<CartProvider>().setPreviewResult(
+          deliveryFee: 30.0,
+          minimumOrderValue: 150.0,
+          failed: true,
+        );
+      }
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -45,6 +104,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
     _razorpay.clear();
     super.dispose();
   }
@@ -54,6 +114,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final cart = context.watch<CartProvider>();
     final addressProvider = context.watch<AddressProvider>();
     final selectedAddress = addressProvider.selectedAddress;
+
+    if (selectedAddress != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _schedulePreviewFetch(selectedAddress, cart.subtotal);
+      });
+    }
 
     return Scaffold(
       backgroundColor: AppColors.cream,
@@ -594,9 +660,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Widget _buildBillDetailsCard(CartProvider cart) {
-    const double minOrderValue = 150.0;
+    final double minOrderValue = cart.minimumOrderValue;
     final bool meetsMinOrder = cart.subtotal >= minOrderValue;
     final double shortfall = meetsMinOrder ? 0.0 : (minOrderValue - cart.subtotal);
+    final double? distanceKm = _previewData != null ? (_previewData!['distance_km'] ?? 0.0).toDouble() : null;
+    final bool isDeliverable = _previewData?['is_deliverable'] ?? true;
+    final String deliveryMsg = _previewData?['delivery_message'] ?? 'Outside delivery area';
+    final bool isAvailable = _previewData?['is_available'] ?? true;
+    final String statusMsg = _previewData?['status_message'] ?? 'Restaurant is currently unavailable';
 
     return Container(
       padding: EdgeInsets.all(16.r),
@@ -619,12 +690,42 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             6.verticalSpace,
             _billRow('Coupon Discount', -cart.couponDiscount, isDiscount: true),
           ],
+          if (distanceKm != null && distanceKm > 0) ...[
+            6.verticalSpace,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Delivery Distance',
+                  style: TextStyle(
+                    fontSize: 13.sp,
+                    color: AppColors.textDark.withValues(alpha: 0.7),
+                  ),
+                ),
+                Text(
+                  '${distanceKm.toStringAsFixed(1)} km',
+                  style: TextStyle(
+                    fontSize: 13.sp,
+                    fontWeight: FontWeight.w600,
+                    color: isDeliverable ? AppColors.textDark : AppColors.error,
+                  ),
+                ),
+              ],
+            ),
+          ],
           6.verticalSpace,
           _billRow(
             'Delivery Fee',
             cart.deliveryFee,
             isFreeDelivery: cart.deliveryFee == 0,
           ),
+          if (cart.previewFailed) ...[
+            4.verticalSpace,
+            Text(
+              'Delivery fee calculated at payment',
+              style: TextStyle(fontSize: 11.sp, color: AppColors.grey, fontStyle: FontStyle.italic),
+            ),
+          ],
           6.verticalSpace,
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -646,6 +747,100 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ),
             ],
           ),
+          if (!isAvailable) ...[
+            10.verticalSpace,
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+              decoration: BoxDecoration(
+                color: AppColors.error.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8.r),
+                border: Border.all(color: AppColors.error.withValues(alpha: 0.2)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.storefront_outlined, color: AppColors.error, size: 16.r),
+                  8.horizontalSpace,
+                  Expanded(
+                    child: Text(
+                      statusMsg,
+                      style: TextStyle(color: AppColors.error, fontSize: 12.sp, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ] else if (!isDeliverable) ...[
+            10.verticalSpace,
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+              decoration: BoxDecoration(
+                color: AppColors.error.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8.r),
+                border: Border.all(color: AppColors.error.withValues(alpha: 0.2)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.location_off_outlined, color: AppColors.error, size: 16.r),
+                  8.horizontalSpace,
+                  Expanded(
+                    child: Text(
+                      deliveryMsg,
+                      style: TextStyle(color: AppColors.error, fontSize: 12.sp, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ] else if (!meetsMinOrder) ...[
+            10.verticalSpace,
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+              decoration: BoxDecoration(
+                color: AppColors.error.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8.r),
+                border: Border.all(color: AppColors.error.withValues(alpha: 0.2)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: AppColors.error, size: 16.r),
+                  8.horizontalSpace,
+                  Expanded(
+                    child: Text(
+                      'Add ₹${shortfall.toStringAsFixed(0)} more to place your order.',
+                      style: TextStyle(color: AppColors.error, fontSize: 12.sp, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          if (!isDeliverable) ...[
+            10.verticalSpace,
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+              decoration: BoxDecoration(
+                color: AppColors.error.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8.r),
+                border: Border.all(color: AppColors.error.withValues(alpha: 0.2)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.location_off_outlined, color: AppColors.error, size: 16.r),
+                  8.horizontalSpace,
+                  Expanded(
+                    child: Text(
+                      deliveryMsg,
+                      style: TextStyle(
+                        color: AppColors.error,
+                        fontSize: 12.sp,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           if (!meetsMinOrder) ...[
             10.verticalSpace,
             Container(
@@ -764,8 +959,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Widget _buildBottomPayBar(CartProvider cart) {
-    const double minOrderValue = 150.0;
-    final bool canPlace = cart.subtotal >= minOrderValue;
+    final double minOrderValue = cart.minimumOrderValue;
+    final bool meetsMinOrder = cart.subtotal >= minOrderValue;
+    final bool isDeliverable = _previewData?['is_deliverable'] ?? true;
+    final bool isAvailable = _previewData?['is_available'] ?? true;
+
+    // If preview call failed, do not block the customer — place_order handles server-side enforcement
+    final bool canPlace = cart.previewFailed || (meetsMinOrder && isDeliverable && isAvailable);
 
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 16.h),
@@ -901,6 +1101,41 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           'latitude': selectedAddress.latitude,
           'longitude': selectedAddress.longitude,
         });
+
+        final serverTotal = (result.data['total'] as num).toDouble();
+        final shownTotal = cart.totalPayable;
+
+        // Safety net: compare server total with displayed total
+        if ((serverTotal - shownTotal).abs() > 0.50) {
+          if (!context.mounted) return;
+          final confirm = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text('Order Total Updated'),
+              content: Text(
+                'The final order total from the server is ₹${serverTotal.toStringAsFixed(0)} '
+                '(Delivery Fee: ₹${((result.data['delivery_fee'] ?? cart.deliveryFee) as num).toStringAsFixed(0)}).\n\n'
+                'Do you want to proceed?',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text('Continue'),
+                ),
+              ],
+            ),
+          );
+
+          if (confirm != true) {
+            setState(() => _placing = false);
+            return;
+          }
+        }
+
         orderId = result.data['order_id'] as String;
         _pendingOrderId = orderId;
         _pendingOrderChoice = _payment;
