@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_functions/cloud_functions.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import '../providers/cart_provider.dart';
@@ -15,6 +14,7 @@ import '../theme/app_theme.dart';
 import '../models/address_model.dart';
 import 'saved_addresses_screen.dart';
 import 'order_success_screen.dart';
+import 'payment_confirmation_screen.dart';
 
 enum PaymentChoice { upi, cod }
 
@@ -758,6 +758,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       return;
     }
 
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please sign in before placing an order.')),
+      );
+      return;
+    }
+
     setState(() => _placing = true);
 
     try {
@@ -877,6 +885,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         _pendingOrderChoice = null;
         cart.clear();
         if (!context.mounted) return;
+        setState(() => _placing = false);
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => OrderSuccessScreen(orderId: orderId)),
@@ -885,7 +894,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       }
 
       // 2b. Online / UPI payment via Razorpay
-      final user = FirebaseAuth.instance.currentUser;
       final session =
           await functions.httpsCallable('razorpay_create_order').call({'order_id': orderId});
 
@@ -898,16 +906,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         amount: amount,
         razorpayOrderId: razorpayOrderId,
         appOrderId: orderId,
-        contact: user?.phoneNumber ?? '',
-        email: user?.email ?? '',
+        contact: currentUser.phoneNumber ?? '',
+        email: currentUser.email ?? '',
       );
+
+      setState(() => _placing = false);
 
       final paymentResult = await RazorpayPaymentService.openCheckout(options);
 
       if (!mounted || !context.mounted) return;
 
       if (!paymentResult.isSuccess) {
-        setState(() => _placing = false);
         if (paymentResult.isDismissed) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Payment cancelled')),
@@ -923,13 +932,25 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         return;
       }
 
-      await _verifyAndCompletePayment(
-        context: context,
-        cart: cart,
-        orderId: orderId,
-        razorpayOrderId: paymentResult.razorpayOrderId!,
-        paymentId: paymentResult.paymentId!,
-        signature: paymentResult.signature!,
+      // Razorpay payment success! DO NOT clear cart here. Navigate immediately to PaymentConfirmationScreen.
+      final confirmedOrderId = orderId;
+      final rzpOrderId = paymentResult.razorpayOrderId ?? razorpayOrderId;
+      final payId = paymentResult.paymentId ?? '';
+      final sig = paymentResult.signature ?? '';
+
+      _pendingOrderId = null;
+      _pendingOrderChoice = null;
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PaymentConfirmationScreen(
+            orderId: confirmedOrderId,
+            razorpayOrderId: rzpOrderId,
+            paymentId: payId,
+            signature: sig,
+          ),
+        ),
       );
     } on FirebaseFunctionsException catch (e) {
       debugPrint('FirebaseFunctionsException: code=${e.code}, message=${e.message}, details=${e.details}');
@@ -945,88 +966,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         SnackBar(content: Text('Could not start payment: $e')),
       );
       setState(() => _placing = false);
-    }
-  }
-
-  /// Verifies the Razorpay payment with the server (`razorpay_verify_payment`).
-  Future<void> _verifyAndCompletePayment({
-    required BuildContext context,
-    required String orderId,
-    required String razorpayOrderId,
-    required String paymentId,
-    required String signature,
-    required CartProvider cart,
-  }) async {
-    String? status;
-    try {
-      final result = await FirebaseFunctions.instanceFor(region: _functionsRegion)
-          .httpsCallable('razorpay_verify_payment')
-          .call({
-        'order_id': orderId,
-        'razorpay_order_id': razorpayOrderId,
-        'razorpay_payment_id': paymentId,
-        'razorpay_signature': signature,
-      });
-      status = result.data['status'] as String?;
-    } on FirebaseFunctionsException catch (e) {
-      debugPrint('razorpay_verify_payment failed: code=${e.code}, message=${e.message}');
-      if (e.code == 'permission-denied' || e.code == 'invalid-argument') {
-        if (mounted && context.mounted) {
-          setState(() => _placing = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(e.message ?? 'Could not verify the payment.')),
-          );
-        }
-        return;
-      }
-    } catch (e) {
-      debugPrint('razorpay_verify_payment error: $e');
-    }
-
-    final paid = status == 'paid' || status == 'already_paid' || await _waitUntilPaid(orderId);
-    if (!mounted || !context.mounted) return;
-    setState(() => _placing = false);
-
-    if (status == 'needs_refund') {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Your payment arrived after the order timed out. '
-              'It will be refunded - please place the order again.'),
-        ),
-      );
-      return;
-    }
-
-    _pendingOrderId = null;
-    _pendingOrderChoice = null;
-    cart.clear();
-    if (!paid) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Payment received. We are confirming your order - '
-              'it will appear in Your Orders in a moment.'),
-        ),
-      );
-    }
-    if (!context.mounted) return;
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => OrderSuccessScreen(orderId: orderId)),
-    );
-  }
-
-  /// Waits (max 20 s) for the server/webhook to flip the order to paid.
-  Future<bool> _waitUntilPaid(String orderId, {int timeoutSeconds = 20}) async {
-    try {
-      await FirebaseFirestore.instance
-          .collection('orders')
-          .doc(orderId)
-          .snapshots()
-          .firstWhere((s) => s.data()?['payment_status'] == 'paid')
-          .timeout(Duration(seconds: timeoutSeconds));
-      return true;
-    } catch (_) {
-      return false;
     }
   }
 }
