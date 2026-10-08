@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:http/http.dart' as http;
@@ -34,7 +35,66 @@ class PlaceDetails {
 }
 
 class LocationSearchService {
-  static const String _mapsApiKey = String.fromEnvironment('MAPS_API_KEY');
+  static const MethodChannel _channel = MethodChannel('com.maruthieats.app/config');
+  static String? _cachedApiKey;
+  static String? _cachedPackageName;
+  static String? _cachedSha1;
+
+  /// Retrieves the Android package name and SHA-1 cert fingerprint for Android API key restriction verification.
+  static Future<Map<String, String>> _getAndroidHeaders() async {
+    if (kIsWeb) return {};
+
+    if (_cachedPackageName != null && _cachedSha1 != null) {
+      final map = <String, String>{};
+      if (_cachedPackageName!.isNotEmpty) map['X-Android-Package'] = _cachedPackageName!;
+      if (_cachedSha1!.isNotEmpty) map['X-Android-Cert'] = _cachedSha1!;
+      return map;
+    }
+
+    try {
+      final Map<dynamic, dynamic>? info =
+          await _channel.invokeMethod<Map<dynamic, dynamic>>('getAndroidHeaderInfo');
+      if (info != null) {
+        _cachedPackageName = info['packageName']?.toString() ?? '';
+        _cachedSha1 = info['sha1']?.toString() ?? '';
+        final map = <String, String>{};
+        if (_cachedPackageName!.isNotEmpty) map['X-Android-Package'] = _cachedPackageName!;
+        if (_cachedSha1!.isNotEmpty) map['X-Android-Cert'] = _cachedSha1!;
+        return map;
+      }
+    } catch (e) {
+      debugPrint('Failed to retrieve Android header info: $e');
+    }
+    return {};
+  }
+
+  /// Retrieves the Google Maps API key from environment or native Android configuration.
+  static Future<String> getApiKey({String? overrideKey}) async {
+    if (overrideKey != null && overrideKey.isNotEmpty) {
+      return overrideKey;
+    }
+
+    const envKey = String.fromEnvironment('MAPS_API_KEY');
+    if (envKey.isNotEmpty) {
+      return envKey;
+    }
+
+    if (_cachedApiKey != null && _cachedApiKey!.isNotEmpty) {
+      return _cachedApiKey!;
+    }
+
+    try {
+      final nativeKey = await _channel.invokeMethod<String>('getMapsApiKey');
+      if (nativeKey != null && nativeKey.isNotEmpty) {
+        _cachedApiKey = nativeKey;
+        return nativeKey;
+      }
+    } catch (e) {
+      debugPrint('Failed to retrieve native MAPS_API_KEY: $e');
+    }
+
+    return '';
+  }
 
   /// Generates a UUID v4 session token for Google Places API autocomplete sessions.
   static String generateSessionToken() {
@@ -46,267 +106,181 @@ class LocationSearchService {
     return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20, 32)}';
   }
 
-  /// Fetches place predictions using Google Places API (New) Autocomplete endpoint.
+  /// Fetches place predictions using ONLY Google Places API (New) Autocomplete endpoint.
   static Future<List<LocationSuggestion>> fetchSuggestions(
     String query, {
     String? apiKey,
     String? sessionToken,
     LatLng? locationBias,
   }) async {
-    final key = apiKey ?? _mapsApiKey;
     final trimmedQuery = query.trim();
-    if (trimmedQuery.length < 2) return [];
+    if (trimmedQuery.isEmpty) return [];
 
-    // 1. Try Google Places API (New) – Autocomplete (New) HTTP API
-    if (key.isNotEmpty) {
-      try {
-        final Map<String, dynamic> requestBody = {
-          'input': trimmedQuery,
-        };
+    final key = await getApiKey(overrideKey: apiKey);
+    debugPrint('Places API key available: ${key.isNotEmpty}');
+    debugPrint('Autocomplete query: $trimmedQuery');
 
-        if (sessionToken != null && sessionToken.isNotEmpty) {
-          requestBody['sessionToken'] = sessionToken;
-        }
-
-        if (locationBias != null) {
-          requestBody['locationBias'] = {
-            'circle': {
-              'center': {
-                'latitude': locationBias.latitude,
-                'longitude': locationBias.longitude,
-              },
-              'radius': 50000.0,
-            }
-          };
-        }
-
-        final response = await http
-            .post(
-              Uri.parse('https://places.googleapis.com/v1/places:autocomplete'),
-              headers: {
-                'Content-Type': 'application/json',
-                'X-Goog-Api-Key': key,
-              },
-              body: jsonEncode(requestBody),
-            )
-            .timeout(const Duration(seconds: 4));
-
-        if (response.statusCode == 200) {
-          final data = jsonDecode(response.body);
-          if (data['suggestions'] is List) {
-            final suggestionsList = data['suggestions'] as List;
-            final List<LocationSuggestion> results = [];
-
-            for (var item in suggestionsList) {
-              final pred = item['placePrediction'];
-              if (pred == null) continue;
-
-              final rawPlaceId = pred['placeId'] ?? pred['place'];
-              String? placeId;
-              if (rawPlaceId is String) {
-                placeId = rawPlaceId.startsWith('places/')
-                    ? rawPlaceId.substring(7)
-                    : rawPlaceId;
-              }
-
-              final structured = pred['structuredFormat'];
-              final mainText = structured?['mainText']?['text'] ??
-                  pred['text']?['text'] ??
-                  trimmedQuery;
-              final secondaryText = structured?['secondaryText']?['text'] ?? '';
-
-              results.add(LocationSuggestion(
-                title: mainText,
-                subtitle: secondaryText,
-                placeId: placeId,
-              ));
-            }
-            return results;
-          }
-        } else {
-          debugPrint(
-              'Places Autocomplete (New) status ${response.statusCode}: ${response.body}');
-        }
-      } catch (e) {
-        debugPrint('Places Autocomplete (New) API error: $e');
-      }
-
-      // 2. Fallback to Legacy Places API if Places (New) failed or returned empty
-      try {
-        final sessionParam = (sessionToken != null && sessionToken.isNotEmpty)
-            ? '&sessiontoken=$sessionToken'
-            : '';
-        final url = Uri.parse(
-          'https://maps.googleapis.com/maps/api/place/autocomplete/json'
-          '?input=${Uri.encodeComponent(trimmedQuery)}'
-          '$sessionParam'
-          '&key=$key',
-        );
-        final response =
-            await http.get(url).timeout(const Duration(seconds: 4));
-        if (response.statusCode == 200) {
-          final data = jsonDecode(response.body);
-          if (data['status'] == 'OK' && data['predictions'] is List) {
-            final predictions = data['predictions'] as List;
-            return predictions.map((p) {
-              final structured = p['structured_formatting'] ?? {};
-              return LocationSuggestion(
-                title: structured['main_text'] ?? p['description'] ?? trimmedQuery,
-                subtitle: structured['secondary_text'] ?? '',
-                placeId: p['place_id'],
-              );
-            }).toList();
-          }
-        }
-      } catch (e) {
-        debugPrint('Legacy Places Autocomplete API fallback error: $e');
-      }
+    if (key.isEmpty) {
+      debugPrint('Places Autocomplete Error: MAPS_API_KEY is not configured or available.');
+      return [];
     }
 
-    // 3. Fallback: Geocoding plugin locationFromAddress
     try {
-      final locations = await Geocoding().locationFromAddress(trimmedQuery);
-      final List<LocationSuggestion> fallbackResults = [];
+      final Map<String, dynamic> requestBody = {
+        'input': trimmedQuery,
+      };
 
-      for (var loc in locations.take(5)) {
-        try {
-          final placemarks = await Geocoding()
-              .placemarkFromCoordinates(loc.latitude, loc.longitude);
-          if (placemarks.isNotEmpty) {
-            final p = placemarks.first;
-            final title = [p.name, p.subLocality]
-                .where((s) => s != null && s.isNotEmpty && s.toLowerCase() != 'null')
-                .join(', ');
-            final subtitle = [p.locality, p.administrativeArea, p.country]
-                .where((s) => s != null && s.isNotEmpty && s.toLowerCase() != 'null')
-                .join(', ');
+      if (sessionToken != null && sessionToken.isNotEmpty) {
+        requestBody['sessionToken'] = sessionToken;
+      }
 
-            fallbackResults.add(LocationSuggestion(
-              title: title.isNotEmpty ? title : (p.locality ?? trimmedQuery),
-              subtitle: subtitle,
-              location: LatLng(loc.latitude, loc.longitude),
+      if (locationBias != null) {
+        requestBody['locationBias'] = {
+          'circle': {
+            'center': {
+              'latitude': locationBias.latitude,
+              'longitude': locationBias.longitude,
+            },
+            'radius': 50000.0,
+          }
+        };
+      }
+
+      final androidHeaders = await _getAndroidHeaders();
+      final headers = <String, String>{
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': key,
+        ...androidHeaders,
+      };
+
+      final response = await http
+          .post(
+            Uri.parse('https://places.googleapis.com/v1/places:autocomplete'),
+            headers: headers,
+            body: jsonEncode(requestBody),
+          )
+          .timeout(const Duration(seconds: 5));
+
+      debugPrint('Autocomplete HTTP status: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['suggestions'] is List) {
+          final suggestionsList = data['suggestions'] as List;
+          final List<LocationSuggestion> results = [];
+
+          for (var item in suggestionsList) {
+            final pred = item['placePrediction'];
+            if (pred == null) continue;
+
+            final rawPlaceId = pred['placeId'] ?? pred['place'];
+            String? placeId;
+            if (rawPlaceId is String) {
+              placeId = rawPlaceId.startsWith('places/')
+                  ? rawPlaceId.substring(7)
+                  : rawPlaceId;
+            }
+
+            final structured = pred['structuredFormat'];
+            final mainText = structured?['mainText']?['text'] ??
+                pred['text']?['text'] ??
+                trimmedQuery;
+            final secondaryText = structured?['secondaryText']?['text'] ?? '';
+
+            results.add(LocationSuggestion(
+              title: mainText,
+              subtitle: secondaryText,
+              placeId: placeId,
             ));
           }
-        } catch (_) {
-          fallbackResults.add(LocationSuggestion(
-            title: trimmedQuery,
-            subtitle:
-                '${loc.latitude.toStringAsFixed(4)}, ${loc.longitude.toStringAsFixed(4)}',
-            location: LatLng(loc.latitude, loc.longitude),
-          ));
+
+          debugPrint('Autocomplete suggestions count: ${results.length}');
+          return results;
+        } else {
+          debugPrint('Autocomplete suggestions count: 0');
+          return [];
         }
+      } else {
+        debugPrint('Places Autocomplete HTTP ${response.statusCode}: ${response.body}');
+        return [];
       }
-      return fallbackResults;
     } catch (e) {
-      debugPrint('Geocoding fallback error: $e');
+      debugPrint('Places Autocomplete HTTP Error: $e');
       return [];
     }
   }
 
-  /// Retrieves place details using Google Places API (New) Place Details endpoint.
+  /// Retrieves place details using ONLY Google Places API (New) Place Details endpoint.
   static Future<PlaceDetails?> getPlaceDetails(
     String placeId, {
     String? apiKey,
     String? sessionToken,
   }) async {
-    final key = apiKey ?? _mapsApiKey;
     if (placeId.isEmpty) return null;
 
-    if (key.isNotEmpty) {
-      final cleanPlaceId =
-          placeId.startsWith('places/') ? placeId.substring(7) : placeId;
+    final cleanPlaceId =
+        placeId.startsWith('places/') ? placeId.substring(7) : placeId;
+    debugPrint('Selected place ID: $cleanPlaceId');
 
-      // 1. Try Google Places API (New) – Place Details (New)
-      try {
-        final headers = <String, String>{
-          'X-Goog-Api-Key': key,
-          'X-Goog-FieldMask': 'id,displayName,formattedAddress,location',
-        };
+    final key = await getApiKey(overrideKey: apiKey);
+    if (key.isEmpty) {
+      debugPrint('Place Details Error: MAPS_API_KEY is not configured or available.');
+      return null;
+    }
 
-        if (sessionToken != null && sessionToken.isNotEmpty) {
-          headers['X-Goog-Session-Token'] = sessionToken;
-        }
+    try {
+      final androidHeaders = await _getAndroidHeaders();
+      final headers = <String, String>{
+        'X-Goog-Api-Key': key,
+        'X-Goog-FieldMask': 'id,displayName,formattedAddress,location',
+        ...androidHeaders,
+      };
 
-        final response = await http
-            .get(
-              Uri.parse('https://places.googleapis.com/v1/places/$cleanPlaceId'),
-              headers: headers,
-            )
-            .timeout(const Duration(seconds: 4));
-
-        if (response.statusCode == 200) {
-          final data = jsonDecode(response.body);
-          final id = data['id'] ?? cleanPlaceId;
-          final displayName = data['displayName']?['text'] ?? '';
-          final formattedAddress = data['formattedAddress'] ?? '';
-          final locationObj = data['location'];
-
-          if (locationObj != null &&
-              locationObj['latitude'] != null &&
-              locationObj['longitude'] != null) {
-            final lat = (locationObj['latitude'] as num).toDouble();
-            final lng = (locationObj['longitude'] as num).toDouble();
-            return PlaceDetails(
-              placeId: id,
-              displayName: displayName,
-              formattedAddress: formattedAddress,
-              location: LatLng(lat, lng),
-            );
-          }
-        } else {
-          debugPrint(
-              'Place Details (New) status ${response.statusCode}: ${response.body}');
-        }
-      } catch (e) {
-        debugPrint('Place Details (New) API error: $e');
+      if (sessionToken != null && sessionToken.isNotEmpty) {
+        headers['X-Goog-Session-Token'] = sessionToken;
       }
 
-      // 2. Fallback: Legacy Place Details API
-      try {
-        final sessionParam = (sessionToken != null && sessionToken.isNotEmpty)
-            ? '&sessiontoken=$sessionToken'
-            : '';
-        final url = Uri.parse(
-          'https://maps.googleapis.com/maps/api/place/details/json'
-          '?place_id=$cleanPlaceId'
-          '&fields=place_id,name,formatted_address,geometry'
-          '$sessionParam'
-          '&key=$key',
-        );
+      final response = await http
+          .get(
+            Uri.parse('https://places.googleapis.com/v1/places/$cleanPlaceId'),
+            headers: headers,
+          )
+          .timeout(const Duration(seconds: 5));
 
-        final response =
-            await http.get(url).timeout(const Duration(seconds: 4));
-        if (response.statusCode == 200) {
-          final data = jsonDecode(response.body);
-          if (data['status'] == 'OK' && data['result'] != null) {
-            final result = data['result'];
-            final id = result['place_id'] ?? cleanPlaceId;
-            final name = result['name'] ?? '';
-            final address = result['formatted_address'] ?? '';
-            final loc = result['geometry']?['location'];
+      debugPrint('Place Details HTTP status: ${response.statusCode}');
 
-            if (loc != null && loc['lat'] != null && loc['lng'] != null) {
-              return PlaceDetails(
-                placeId: id,
-                displayName: name,
-                formattedAddress: address,
-                location: LatLng(
-                  (loc['lat'] as num).toDouble(),
-                  (loc['lng'] as num).toDouble(),
-                ),
-              );
-            }
-          }
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final id = data['id'] ?? cleanPlaceId;
+        final displayName = data['displayName']?['text'] ?? '';
+        final formattedAddress = data['formattedAddress'] ?? '';
+        final locationObj = data['location'];
+
+        if (locationObj != null &&
+            locationObj['latitude'] != null &&
+            locationObj['longitude'] != null) {
+          final lat = (locationObj['latitude'] as num).toDouble();
+          final lng = (locationObj['longitude'] as num).toDouble();
+          debugPrint('Selected coordinates: $lat, $lng');
+
+          return PlaceDetails(
+            placeId: id,
+            displayName: displayName,
+            formattedAddress: formattedAddress,
+            location: LatLng(lat, lng),
+          );
         }
-      } catch (e) {
-        debugPrint('Legacy Place details error: $e');
+      } else {
+        debugPrint('Places Details HTTP ${response.statusCode}: ${response.body}');
       }
+    } catch (e) {
+      debugPrint('Place Details HTTP Error: $e');
     }
 
     return null;
   }
 
-  /// Resolves location coordinates for a given suggestion.
+  /// Resolves location coordinates for a given suggestion using Place Details.
   static Future<LatLng?> resolveLocation(
     LocationSuggestion suggestion, {
     String? apiKey,
@@ -327,7 +301,7 @@ class LocationSearchService {
       }
     }
 
-    // Fallback: Geocode using title + subtitle
+    // Fallback geocoding only for location resolution if place details returned no geometry
     try {
       final fullText = '${suggestion.title}, ${suggestion.subtitle}'.trim();
       final locations = await Geocoding().locationFromAddress(fullText);

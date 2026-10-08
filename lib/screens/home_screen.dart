@@ -43,15 +43,15 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                StreamBuilder<RestaurantSettings>(
-                  stream: RestaurantService().streamSettings(),
-                  builder: (context, snapshot) {
-                    final settings = snapshot.data ?? RestaurantSettings.defaultSettings();
-                    return RestaurantStatusBanner(settings: settings);
-                  },
-                ),
+                // StreamBuilder<RestaurantSettings>(
+                //   stream: RestaurantService().streamSettings(),
+                //   builder: (context, snapshot) {
+                //     final settings = snapshot.data ?? RestaurantSettings.defaultSettings();
+                //     return RestaurantStatusBanner(settings: settings);
+                //   },
+                // ),
                 8.verticalSpace,
-                // Banner Carousel
+                // // Banner Carousel
                 _buildBannerCarousel(),
 
                 24.verticalSpace,

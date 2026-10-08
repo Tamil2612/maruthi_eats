@@ -29,6 +29,8 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
   double? _lastGeocodedLat;
   double? _lastGeocodedLng;
 
+  int _currentStep = 0; // 0: Select Location, 1: Enter Details
+
   final _searchController = TextEditingController();
   final _flatNoController = TextEditingController();
   final _streetController = TextEditingController();
@@ -135,7 +137,7 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
     _debounceTimer?.cancel();
     final search = query.trim();
 
-    if (search.length < 2) {
+    if (search.isEmpty) {
       setState(() {
         _suggestions = [];
         _hasNoResults = false;
@@ -160,7 +162,7 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
 
   Future<void> _fetchLocationSuggestions(String query) async {
     final search = query.trim();
-    if (search.length < 2) return;
+    if (search.isEmpty) return;
 
     final currentQueryId = ++_searchQueryId;
     _lastSearchQuery = search;
@@ -305,8 +307,9 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
   double? get _distanceToRestaurantKm {
     if (_restaurantSettings == null) return null;
     final del = _restaurantSettings!.delivery;
-    if (del.restaurantLatitude == 0.0 && del.restaurantLongitude == 0.0)
+    if (del.restaurantLatitude == 0.0 && del.restaurantLongitude == 0.0) {
       return null;
+    }
 
     final meters = Geolocator.distanceBetween(
       del.restaurantLatitude,
@@ -337,33 +340,478 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
 
   @override
   Widget build(BuildContext context) {
+    return PopScope(
+      canPop: _currentStep == 0,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (_currentStep == 1) {
+          setState(() => _currentStep = 0);
+        }
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.cream,
+        appBar: AppBar(
+          title: Text(
+            _currentStep == 0
+                ? (widget.address == null
+                    ? 'Set Delivery Location'
+                    : 'Edit Location')
+                : 'Enter Address Details',
+            style: GoogleFonts.playfairDisplay(
+              color: AppColors.white,
+              fontSize: 18.sp,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          elevation: 0,
+          backgroundColor: AppColors.maroon,
+          iconTheme: const IconThemeData(color: AppColors.gold),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () {
+              if (_currentStep == 1) {
+                setState(() => _currentStep = 0);
+              } else {
+                Navigator.pop(context);
+              }
+            },
+          ),
+        ),
+        body: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 300),
+          child: _currentStep == 0
+              ? _buildStep1LocationSelection()
+              : _buildStep2AddressDetails(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStep1LocationSelection() {
     final distKm = _distanceToRestaurantKm;
     final maxDistKm =
         _restaurantSettings?.delivery.maxDeliveryDistanceKm ?? 8.0;
     final outsideArea = _isOutsideDeliveryArea;
 
-    return Scaffold(
-      backgroundColor: AppColors.cream,
-      appBar: AppBar(
-        title: Text(
-          widget.address == null ? 'Set Delivery Location' : 'Edit Address',
-          style: GoogleFonts.playfairDisplay(
-            color: AppColors.white,
-            fontSize: 18.sp,
-            fontWeight: FontWeight.bold,
+    return Stack(
+      key: const ValueKey(0),
+      children: [
+        // Full Map Background
+        GoogleMap(
+          initialCameraPosition: CameraPosition(
+            target: _selectedLocation,
+            zoom: 16,
+          ),
+          onMapCreated: (c) => _mapController = c,
+          onCameraMove: (pos) => _selectedLocation = pos.target,
+          onCameraIdle: _onCameraIdle,
+          myLocationEnabled: true,
+          myLocationButtonEnabled: false,
+          zoomControlsEnabled: false,
+        ),
+
+        // Map Center Pin Indicator
+        Center(
+          child: Padding(
+            padding: EdgeInsets.only(bottom: 36.h),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding:
+                      EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+                  decoration: BoxDecoration(
+                    color: outsideArea ? AppColors.error : AppColors.textDark,
+                    borderRadius: BorderRadius.circular(8.r),
+                  ),
+                  child: Text(
+                    outsideArea
+                        ? 'Outside delivery area (${distKm?.toStringAsFixed(1)} km)'
+                        : 'Order will be delivered here',
+                    style: TextStyle(
+                      color: AppColors.white,
+                      fontSize: 10.sp,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                4.verticalSpace,
+                Icon(
+                  Icons.location_on_rounded,
+                  color: outsideArea ? AppColors.error : AppColors.maroon,
+                  size: 42.r,
+                ),
+              ],
+            ),
           ),
         ),
-        elevation: 0,
-        backgroundColor: AppColors.maroon,
-        iconTheme: const IconThemeData(color: AppColors.gold),
-      ),
-      body: Stack(
-        children: [
-          Column(
+
+        // Floating Search Bar & Autocomplete Suggestions Dropdown
+        Positioned(
+          top: 16.h,
+          left: 16.w,
+          right: 16.w,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              // Top Map Section
-              Expanded(
-                flex: 4,
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 12.w),
+                decoration: BoxDecoration(
+                  color: AppColors.white,
+                  borderRadius: BorderRadius.circular(16.r),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.black.withValues(alpha: 0.12),
+                      blurRadius: 14.r,
+                      offset: const Offset(0, 4),
+                    )
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.search_rounded,
+                        color: AppColors.maroon, size: 22.r),
+                    10.horizontalSpace,
+                    Expanded(
+                      child: TextField(
+                        controller: _searchController,
+                        onChanged: _onSearchChanged,
+                        textInputAction: TextInputAction.search,
+                        onSubmitted: (val) => _fetchLocationSuggestions(val),
+                        decoration: InputDecoration(
+                          hintText: 'Search city, area or landmark...',
+                          hintStyle: TextStyle(
+                            fontSize: 13.sp,
+                            color: AppColors.grey,
+                          ),
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          contentPadding: EdgeInsets.symmetric(vertical: 12.h),
+                        ),
+                      ),
+                    ),
+                    if (_isSearching)
+                      SizedBox(
+                        width: 18.w,
+                        height: 18.h,
+                        child: const CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.maroon,
+                        ),
+                      )
+                    else if (_searchController.text.isNotEmpty)
+                      IconButton(
+                        icon: Icon(Icons.clear_rounded,
+                            size: 18.r, color: AppColors.grey),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() {
+                            _suggestions = [];
+                            _hasNoResults = false;
+                            _isSearching = false;
+                          });
+                          _sessionToken = null;
+                          _lastSearchQuery = '';
+                        },
+                      ),
+                  ],
+                ),
+              ),
+
+              // Search Suggestions Dropdown List
+              if (_hasNoResults) ...[
+                6.verticalSpace,
+                Container(
+                  padding: EdgeInsets.all(14.r),
+                  decoration: BoxDecoration(
+                    color: AppColors.white,
+                    borderRadius: BorderRadius.circular(16.r),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.search_off_rounded,
+                          color: AppColors.grey, size: 18.r),
+                      8.horizontalSpace,
+                      Text('No places found',
+                          style: TextStyle(
+                              fontSize: 12.sp, color: AppColors.grey)),
+                    ],
+                  ),
+                ),
+              ] else if (_suggestions.isNotEmpty) ...[
+                6.verticalSpace,
+                Container(
+                  constraints: BoxConstraints(maxHeight: 320.h),
+                  decoration: BoxDecoration(
+                    color: AppColors.white,
+                    borderRadius: BorderRadius.circular(16.r),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.black.withValues(alpha: 0.15),
+                        blurRadius: 16.r,
+                        offset: const Offset(0, 6),
+                      )
+                    ],
+                  ),
+                  child: ListView.separated(
+                    padding: EdgeInsets.symmetric(vertical: 8.h),
+                    shrinkWrap: true,
+                    itemCount: _suggestions.length,
+                    separatorBuilder: (_, __) => Divider(
+                      height: 1,
+                      color: AppColors.textDark.withValues(alpha: 0.06),
+                    ),
+                    itemBuilder: (context, index) {
+                      final item = _suggestions[index];
+                      return ListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.symmetric(
+                            horizontal: 16.w, vertical: 2.h),
+                        leading: Container(
+                          padding: EdgeInsets.all(6.r),
+                          decoration: BoxDecoration(
+                            color: AppColors.maroon.withValues(alpha: 0.08),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(Icons.location_on_outlined,
+                              color: AppColors.maroon, size: 18.r),
+                        ),
+                        title: Text(
+                          item.title,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13.sp,
+                            color: AppColors.textDark,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        subtitle: item.subtitle.isNotEmpty
+                            ? Text(
+                                item.subtitle,
+                                style: TextStyle(
+                                  fontSize: 11.sp,
+                                  color: AppColors.grey,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              )
+                            : null,
+                        onTap: () => _selectSuggestion(item),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+
+        // Bottom Area (Floating "Locate Me" Button + Summary Card)
+        Positioned(
+          bottom: 0,
+          left: 0,
+          right: 0,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              // Compact Floating "Locate Me" Button
+              Padding(
+                padding: EdgeInsets.only(right: 16.w, bottom: 12.h),
+                child: Material(
+                  elevation: 4,
+                  shape: const CircleBorder(),
+                  color: AppColors.white,
+                  clipBehavior: Clip.antiAlias,
+                  child: InkWell(
+                    onTap: _getCurrentLocation,
+                    child: Container(
+                      width: 44.r,
+                      height: 44.r,
+                      alignment: Alignment.center,
+                      child: _isLoadingLocation
+                          ? SizedBox(
+                              width: 20.r,
+                              height: 20.r,
+                              child: const CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                color: AppColors.maroon,
+                              ),
+                            )
+                          : Icon(
+                              Icons.my_location_rounded,
+                              size: 22.r,
+                              color: AppColors.maroon,
+                            ),
+                    ),
+                  ),
+                ),
+              ),
+
+              // Bottom Summary & Continue Card
+              Container(
+                padding: EdgeInsets.all(18.r),
+                decoration: BoxDecoration(
+                  color: AppColors.white,
+                  borderRadius:
+                      BorderRadius.vertical(top: Radius.circular(24.r)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.black.withValues(alpha: 0.12),
+                      blurRadius: 16.r,
+                      offset: const Offset(0, -4),
+                    )
+                  ],
+                ),
+                child: SafeArea(
+                  top: false,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: EdgeInsets.all(8.r),
+                            decoration: BoxDecoration(
+                              color: AppColors.maroon.withValues(alpha: 0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(Icons.location_on_rounded,
+                                color: AppColors.maroon, size: 22.r),
+                          ),
+                          12.horizontalSpace,
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Selected Delivery Location',
+                                  style: TextStyle(
+                                    fontSize: 11.sp,
+                                    color: AppColors.grey,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                2.verticalSpace,
+                                Text(
+                                  _streetController.text.isNotEmpty
+                                      ? _streetController.text
+                                      : 'Move map or search location',
+                                  style: TextStyle(
+                                    fontSize: 13.sp,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.textDark,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (outsideArea && distKm != null) ...[
+                        12.verticalSpace,
+                        Container(
+                          padding: EdgeInsets.symmetric(
+                              horizontal: 12.w, vertical: 8.h),
+                          decoration: BoxDecoration(
+                            color: AppColors.error.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(10.r),
+                            border: Border.all(
+                                color: AppColors.error.withValues(alpha: 0.3)),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.error_outline,
+                                  color: AppColors.error, size: 18.r),
+                              8.horizontalSpace,
+                              Expanded(
+                                child: Text(
+                                  'Outside delivery area (${distKm.toStringAsFixed(1)} km away, max is ${maxDistKm.toStringAsFixed(0)} km)',
+                                  style: TextStyle(
+                                    color: AppColors.error,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 11.sp,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                      16.verticalSpace,
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50.h,
+                        child: ElevatedButton(
+                          onPressed: outsideArea
+                              ? null
+                              : () {
+                                  FocusScope.of(context).unfocus();
+                                  setState(() => _currentStep = 1);
+                                },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.maroon,
+                            foregroundColor: AppColors.gold,
+                            elevation: 2,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14.r),
+                            ),
+                          ),
+                          child: Text(
+                            outsideArea
+                                ? 'LOCATION OUTSIDE DELIVERY AREA'
+                                : 'CONFIRM LOCATION & CONTINUE',
+                            style: TextStyle(
+                              fontSize: 13.sp,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStep2AddressDetails() {
+    final distKm = _distanceToRestaurantKm;
+    final maxDistKm =
+        _restaurantSettings?.delivery.maxDeliveryDistanceKm ?? 8.0;
+    final outsideArea = _isOutsideDeliveryArea;
+
+    return Stack(
+      key: const ValueKey(1),
+      children: [
+        Column(
+          children: [
+            // Top Compact Map Preview Card
+            Container(
+              height: 160.h,
+              margin: EdgeInsets.all(16.r),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16.r),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.black.withValues(alpha: 0.1),
+                    blurRadius: 10.r,
+                    offset: const Offset(0, 4),
+                  )
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16.r),
                 child: Stack(
                   children: [
                     GoogleMap(
@@ -371,433 +819,241 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
                         target: _selectedLocation,
                         zoom: 16,
                       ),
-                      onMapCreated: (c) => _mapController = c,
-                      onCameraMove: (pos) => _selectedLocation = pos.target,
-                      onCameraIdle: _onCameraIdle,
-                      myLocationEnabled: true,
-                      myLocationButtonEnabled: false,
                       zoomControlsEnabled: false,
+                      scrollGesturesEnabled: false,
+                      zoomGesturesEnabled: false,
+                      rotateGesturesEnabled: false,
+                      tiltGesturesEnabled: false,
+                      myLocationButtonEnabled: false,
+                      markers: {
+                        Marker(
+                          markerId: const MarkerId('selected'),
+                          position: _selectedLocation,
+                        ),
+                      },
                     ),
-
-                    // Map Center Pin Indicator
-                    Center(
-                      child: Padding(
-                        padding: EdgeInsets.only(bottom: 36.h),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              padding: EdgeInsets.symmetric(
-                                  horizontal: 10.w, vertical: 4.h),
-                              decoration: BoxDecoration(
-                                color: outsideArea
-                                    ? AppColors.error
-                                    : AppColors.textDark,
-                                borderRadius: BorderRadius.circular(8.r),
-                              ),
-                              child: Text(
-                                outsideArea
-                                    ? 'Outside delivery area (${distKm?.toStringAsFixed(1)} km)'
-                                    : 'Order will be delivered here',
-                                style: TextStyle(
-                                  color: AppColors.white,
-                                  fontSize: 10.sp,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                            4.verticalSpace,
-                            Icon(
-                              Icons.location_on_rounded,
-                              color: outsideArea
-                                  ? AppColors.error
-                                  : AppColors.maroon,
-                              size: 42.r,
-                            ),
+                    Positioned(
+                      bottom: 12.h,
+                      left: 12.w,
+                      right: 12.w,
+                      child: Container(
+                        padding: EdgeInsets.symmetric(
+                            horizontal: 12.w, vertical: 8.h),
+                        decoration: BoxDecoration(
+                          color: AppColors.white,
+                          borderRadius: BorderRadius.circular(12.r),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.black.withValues(alpha: 0.1),
+                              blurRadius: 8.r,
+                            )
                           ],
                         ),
-                      ),
-                    ),
-
-                    // Location Search Bar & Suggestions Overlay
-                    Positioned(
-                      top: 16.h,
-                      left: 16.w,
-                      right: 16.w,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            padding: EdgeInsets.symmetric(horizontal: 12.w),
-                            decoration: BoxDecoration(
-                              color: AppColors.white,
-                              borderRadius: BorderRadius.circular(16.r),
-                              boxShadow: [
-                                BoxShadow(
+                        child: Row(
+                          children: [
+                            Icon(Icons.location_on,
+                                color: AppColors.maroon, size: 18.r),
+                            8.horizontalSpace,
+                            Expanded(
+                              child: Text(
+                                _streetController.text.isNotEmpty
+                                    ? _streetController.text
+                                    : 'Pinned Location',
+                                style: TextStyle(
+                                  fontSize: 11.sp,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.textDark,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            8.horizontalSpace,
+                            InkWell(
+                              onTap: () => setState(() => _currentStep = 0),
+                              child: Container(
+                                padding: EdgeInsets.symmetric(
+                                    horizontal: 10.w, vertical: 4.h),
+                                decoration: BoxDecoration(
                                   color:
-                                      AppColors.black.withValues(alpha: 0.12),
-                                  blurRadius: 14.r,
-                                  offset: const Offset(0, 4),
-                                )
-                              ],
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(Icons.search_rounded,
-                                    color: AppColors.maroon, size: 22.r),
-                                10.horizontalSpace,
-                                Expanded(
-                                  child: TextField(
-                                    controller: _searchController,
-                                    onChanged: _onSearchChanged,
-                                    textInputAction: TextInputAction.search,
-                                    onSubmitted: (val) =>
-                                        _fetchLocationSuggestions(val),
-                                    decoration: InputDecoration(
-                                      hintText:
-                                          'Search city, area or landmark...',
-                                      hintStyle: TextStyle(
-                                        fontSize: 13.sp,
-                                        color: AppColors.grey,
-                                      ),
-                                      border: InputBorder.none,
-                                      enabledBorder: InputBorder.none,
-                                      focusedBorder: InputBorder.none,
-                                      contentPadding:
-                                          EdgeInsets.symmetric(vertical: 12.h),
-                                    ),
+                                      AppColors.maroon.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(8.r),
+                                ),
+                                child: Text(
+                                  'Change',
+                                  style: TextStyle(
+                                    fontSize: 11.sp,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.maroon,
                                   ),
                                 ),
-                                if (_isSearching)
-                                  SizedBox(
-                                    width: 18.w,
-                                    height: 18.h,
-                                    child: const CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: AppColors.maroon,
-                                    ),
-                                  )
-                                else if (_searchController.text.isNotEmpty)
-                                  IconButton(
-                                    icon: Icon(Icons.clear_rounded,
-                                        size: 18.r, color: AppColors.grey),
-                                    onPressed: () {
-                                      _searchController.clear();
-                                      setState(() {
-                                        _suggestions = [];
-                                        _hasNoResults = false;
-                                        _isSearching = false;
-                                      });
-                                      _sessionToken = null;
-                                      _lastSearchQuery = '';
-                                    },
-                                  ),
-                              ],
-                            ),
-                          ),
-
-                          // Search Suggestions Dropdown List
-                          if (_hasNoResults) ...[
-                            6.verticalSpace,
-                            Container(
-                              padding: EdgeInsets.all(14.r),
-                              decoration: BoxDecoration(
-                                color: AppColors.white,
-                                borderRadius: BorderRadius.circular(16.r),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(Icons.search_off_rounded,
-                                      color: AppColors.grey, size: 18.r),
-                                  8.horizontalSpace,
-                                  Text('No places found',
-                                      style: TextStyle(
-                                          fontSize: 12.sp,
-                                          color: AppColors.grey)),
-                                ],
-                              ),
-                            ),
-                          ] else if (_suggestions.isNotEmpty) ...[
-                            6.verticalSpace,
-                            Container(
-                              constraints: BoxConstraints(maxHeight: 220.h),
-                              decoration: BoxDecoration(
-                                color: AppColors.white,
-                                borderRadius: BorderRadius.circular(16.r),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color:
-                                        AppColors.black.withValues(alpha: 0.15),
-                                    blurRadius: 16.r,
-                                    offset: const Offset(0, 6),
-                                  )
-                                ],
-                              ),
-                              child: ListView.separated(
-                                padding: EdgeInsets.symmetric(vertical: 8.h),
-                                shrinkWrap: true,
-                                itemCount: _suggestions.length,
-                                separatorBuilder: (_, __) => Divider(
-                                  height: 1,
-                                  color: AppColors.textDark
-                                      .withValues(alpha: 0.06),
-                                ),
-                                itemBuilder: (context, index) {
-                                  final item = _suggestions[index];
-                                  return ListTile(
-                                    dense: true,
-                                    contentPadding: EdgeInsets.symmetric(
-                                        horizontal: 16.w, vertical: 2.h),
-                                    leading: Container(
-                                      padding: EdgeInsets.all(6.r),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.maroon
-                                            .withValues(alpha: 0.08),
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: Icon(Icons.location_on_outlined,
-                                          color: AppColors.maroon, size: 18.r),
-                                    ),
-                                    title: Text(
-                                      item.title,
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 13.sp,
-                                        color: AppColors.textDark,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    subtitle: item.subtitle.isNotEmpty
-                                        ? Text(
-                                            item.subtitle,
-                                            style: TextStyle(
-                                              fontSize: 11.sp,
-                                              color: AppColors.grey,
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          )
-                                        : null,
-                                    onTap: () => _selectSuggestion(item),
-                                  );
-                                },
                               ),
                             ),
                           ],
-                        ],
-                      ),
-                    ),
-
-                    // Floating GPS "Locate Me" Button
-                    Positioned(
-                      bottom: 24.h,
-                      right: 16.w,
-                      child: FloatingActionButton.extended(
-                        elevation: 4,
-                        backgroundColor: AppColors.white,
-                        foregroundColor: AppColors.maroon,
-                        onPressed: _getCurrentLocation,
-                        icon: _isLoadingLocation
-                            ? SizedBox(
-                                width: 16.w,
-                                height: 16.h,
-                                child: const CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: AppColors.maroon,
-                                ),
-                              )
-                            : Icon(Icons.my_location_rounded,
-                                size: 18.r, color: AppColors.maroon),
-                        label: Text(
-                          'Locate Me',
-                          style: TextStyle(
-                            fontSize: 12.sp,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.maroon,
-                          ),
                         ),
                       ),
                     ),
                   ],
                 ),
               ),
+            ),
 
-              // Bottom Address Form Section
-              Expanded(
-                flex: 5,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: AppColors.white,
-                    borderRadius:
-                        BorderRadius.vertical(top: Radius.circular(24.r)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.black.withValues(alpha: 0.08),
-                        blurRadius: 16.r,
-                        offset: const Offset(0, -6),
-                      )
-                    ],
-                  ),
-                  child: SingleChildScrollView(
-                    padding:
-                        EdgeInsets.symmetric(horizontal: 20.w, vertical: 20.h),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (outsideArea && distKm != null) ...[
-                          Container(
-                            padding: EdgeInsets.symmetric(
-                                horizontal: 14.w, vertical: 10.h),
-                            decoration: BoxDecoration(
-                              color: AppColors.error.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(12.r),
-                              border: Border.all(
-                                  color:
-                                      AppColors.error.withValues(alpha: 0.3)),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(Icons.error_outline,
-                                    color: AppColors.error, size: 20.r),
-                                10.horizontalSpace,
-                                Expanded(
-                                  child: Text(
-                                    'Outside delivery area (${distKm.toStringAsFixed(1)} km away, max is ${maxDistKm.toStringAsFixed(0)} km)',
-                                    style: TextStyle(
-                                      color: AppColors.error,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 12.sp,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          16.verticalSpace,
-                        ],
-
-                        _sectionTitle(
-                            "Receiver's Contact", Icons.person_outline_rounded),
-                        12.verticalSpace,
-                        _buildTextField(
-                          controller: _nameController,
-                          label: "Recipient Name",
-                          icon: Icons.person,
+            // Address Details Form
+            Expanded(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 10.h),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (outsideArea && distKm != null) ...[
+                      Container(
+                        padding: EdgeInsets.symmetric(
+                            horizontal: 14.w, vertical: 10.h),
+                        decoration: BoxDecoration(
+                          color: AppColors.error.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(12.r),
+                          border: Border.all(
+                              color: AppColors.error.withValues(alpha: 0.3)),
                         ),
-                        12.verticalSpace,
-                        _buildTextField(
-                          controller: _phoneController,
-                          label: "Contact Number",
-                          icon: Icons.phone,
-                          keyboardType: TextInputType.phone,
-                        ),
-                        20.verticalSpace,
-
-                        _sectionTitle(
-                            "Address Details", Icons.location_on_outlined),
-                        12.verticalSpace,
-                        _buildTextField(
-                          controller: _flatNoController,
-                          label: "Flat / House No. / Building / Landmark *",
-                          icon: Icons.apartment_rounded,
-                        ),
-                        12.verticalSpace,
-                        _buildTextField(
-                          controller: _streetController,
-                          label: "Street / Area / Address (auto-filled)",
-                          icon: Icons.location_city_rounded,
-                          maxLines: 2,
-                        ),
-                        20.verticalSpace,
-
-                        _sectionTitle("Save Address As", Icons.label_outlined),
-                        12.verticalSpace,
-                        Row(
+                        child: Row(
                           children: [
-                            _typeChip("Home", Icons.home_rounded),
+                            Icon(Icons.error_outline,
+                                color: AppColors.error, size: 20.r),
                             10.horizontalSpace,
-                            _typeChip("Work", Icons.business_rounded),
-                            10.horizontalSpace,
-                            _typeChip("Other", Icons.place_rounded),
+                            Expanded(
+                              child: Text(
+                                'Outside delivery area (${distKm.toStringAsFixed(1)} km away, max is ${maxDistKm.toStringAsFixed(0)} km)',
+                                style: TextStyle(
+                                  color: AppColors.error,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12.sp,
+                                ),
+                              ),
+                            ),
                           ],
                         ),
-                        if (_selectedType == 'Other') ...[
-                          12.verticalSpace,
-                          _buildTextField(
-                            controller: _labelController,
-                            label:
-                                "Address Label (e.g. Parents, Friend's House)",
-                            icon: Icons.edit_note_rounded,
-                          ),
-                        ],
-                        90.verticalSpace, // Bottom padding for sticky button
+                      ),
+                      16.verticalSpace,
+                    ],
+
+                    _sectionTitle(
+                        "Receiver's Contact", Icons.person_outline_rounded),
+                    12.verticalSpace,
+                    _buildTextField(
+                      controller: _nameController,
+                      label: "Recipient Name",
+                      icon: Icons.person,
+                    ),
+                    12.verticalSpace,
+                    _buildTextField(
+                      controller: _phoneController,
+                      label: "Contact Number",
+                      icon: Icons.phone,
+                      keyboardType: TextInputType.phone,
+                    ),
+                    20.verticalSpace,
+
+                    _sectionTitle(
+                        "Address Details", Icons.location_on_outlined),
+                    12.verticalSpace,
+                    _buildTextField(
+                      controller: _flatNoController,
+                      label: "Flat / House No. / Building / Landmark *",
+                      icon: Icons.apartment_rounded,
+                    ),
+                    12.verticalSpace,
+                    _buildTextField(
+                      controller: _streetController,
+                      label: "Street / Area / Address (auto-filled)",
+                      icon: Icons.location_city_rounded,
+                      maxLines: 2,
+                    ),
+                    20.verticalSpace,
+
+                    _sectionTitle("Save Address As", Icons.label_outlined),
+                    12.verticalSpace,
+                    Row(
+                      children: [
+                        _typeChip("Home", Icons.home_rounded),
+                        10.horizontalSpace,
+                        _typeChip("Work", Icons.business_rounded),
+                        10.horizontalSpace,
+                        _typeChip("Other", Icons.place_rounded),
                       ],
                     ),
-                  ),
+                    if (_selectedType == 'Other') ...[
+                      12.verticalSpace,
+                      _buildTextField(
+                        controller: _labelController,
+                        label: "Address Label (e.g. Parents, Friend's House)",
+                        icon: Icons.edit_note_rounded,
+                      ),
+                    ],
+                    90.verticalSpace, // Bottom padding for sticky button
+                  ],
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
+        ),
 
-          // Bottom Action Button
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: Container(
-              padding: EdgeInsets.all(20.r),
-              decoration: BoxDecoration(
-                color: AppColors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.black.withValues(alpha: 0.08),
-                    blurRadius: 12.r,
-                    offset: const Offset(0, -4),
-                  )
-                ],
-              ),
-              child: SafeArea(
-                top: false,
-                child: SizedBox(
-                  width: double.infinity,
-                  height: 52.h,
-                  child: ElevatedButton(
-                    onPressed: (_saving || outsideArea) ? null : _save,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.maroon,
-                      foregroundColor: AppColors.gold,
-                      elevation: 2,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14.r),
-                      ),
+        // Bottom Action Button
+        Positioned(
+          bottom: 0,
+          left: 0,
+          right: 0,
+          child: Container(
+            padding: EdgeInsets.all(20.r),
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.black.withValues(alpha: 0.08),
+                  blurRadius: 12.r,
+                  offset: const Offset(0, -4),
+                )
+              ],
+            ),
+            child: SafeArea(
+              top: false,
+              child: SizedBox(
+                width: double.infinity,
+                height: 52.h,
+                child: ElevatedButton(
+                  onPressed: (_saving || outsideArea) ? null : _save,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.maroon,
+                    foregroundColor: AppColors.gold,
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14.r),
                     ),
-                    child: _saving
-                        ? SizedBox(
-                            width: 22.w,
-                            height: 22.h,
-                            child: const CircularProgressIndicator(
-                              strokeWidth: 2.5,
-                              color: AppColors.gold,
-                            ),
-                          )
-                        : Text(
-                            outsideArea
-                                ? 'LOCATION OUTSIDE DELIVERY AREA'
-                                : 'SAVE ADDRESS',
-                            style: TextStyle(
-                              fontSize: 13.sp,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
                   ),
+                  child: _saving
+                      ? SizedBox(
+                          width: 22.w,
+                          height: 22.h,
+                          child: const CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            color: AppColors.gold,
+                          ),
+                        )
+                      : Text(
+                          outsideArea
+                              ? 'LOCATION OUTSIDE DELIVERY AREA'
+                              : 'SAVE ADDRESS',
+                          style: TextStyle(
+                            fontSize: 13.sp,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
                 ),
               ),
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 

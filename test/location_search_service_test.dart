@@ -3,6 +3,8 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:maruthi_eats/services/location_search_service.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('LocationSearchService tests', () {
     test('generateSessionToken generates a valid UUID v4 format', () {
       final token1 = LocationSearchService.generateSessionToken();
@@ -51,9 +53,14 @@ void main() {
       expect(details.location.longitude, 55.2744);
     });
 
-    test('fetchSuggestions returns empty list for short query', () async {
-      final results = await LocationSearchService.fetchSuggestions('a');
+    test('fetchSuggestions returns empty list for empty query', () async {
+      final results = await LocationSearchService.fetchSuggestions('');
       expect(results, isEmpty);
+    });
+
+    test('getApiKey accepts overrideKey', () async {
+      final key = await LocationSearchService.getApiKey(overrideKey: 'test_key');
+      expect(key, 'test_key');
     });
   });
 }
