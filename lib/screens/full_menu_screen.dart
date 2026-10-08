@@ -9,6 +9,7 @@ import '../providers/cart_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/menu_item_card.dart';
 import '../widgets/cart_fab.dart';
+import '../widgets/restaurant_status_banner.dart';
 
 class FullMenuScreen extends StatefulWidget {
   final String? initialCategory;
@@ -161,6 +162,7 @@ class _FullMenuScreenState extends State<FullMenuScreen> {
                     physics: const BouncingScrollPhysics(),
                     slivers: [
                       _buildAppBar(),
+                      const SliverToBoxAdapter(child: RestaurantStatusBanner()),
                       SliverToBoxAdapter(child: _buildSearchAndFilters()),
                       SliverPersistentHeader(
                         pinned: true,

@@ -3,6 +3,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import '../models/menu_item.dart';
 import '../providers/cart_provider.dart';
+import '../providers/restaurant_provider.dart';
 import '../theme/app_theme.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'skeleton_loaders.dart';
@@ -16,14 +17,17 @@ class MenuItemCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cart = context.watch<CartProvider>();
+    final restaurant = context.watch<RestaurantProvider>();
     final qty = cart.quantityOf(item.id);
+    final bool isAccepting = restaurant.isAcceptingOrders;
 
     return Card(
       margin: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16.r),
-        side: BorderSide(color: AppColors.maroon.withValues(alpha: 0.05), width: 1.w),
+        side: BorderSide(
+            color: AppColors.maroon.withValues(alpha: 0.05), width: 1.w),
       ),
       child: InkWell(
         onTap: () => showModalBottomSheet(
@@ -50,10 +54,18 @@ class MenuItemCard extends StatelessWidget {
                           margin: EdgeInsets.only(top: 4.h),
                           padding: EdgeInsets.all(1.5.r),
                           decoration: BoxDecoration(
-                            border: Border.all(color: item.isVeg ? AppColors.success : AppColors.error, width: 1.w),
+                            border: Border.all(
+                                color: item.isVeg
+                                    ? AppColors.success
+                                    : AppColors.error,
+                                width: 1.w),
                             borderRadius: BorderRadius.circular(2.r),
                           ),
-                          child: Icon(Icons.circle, size: 6.r, color: item.isVeg ? AppColors.success : AppColors.error),
+                          child: Icon(Icons.circle,
+                              size: 6.r,
+                              color: item.isVeg
+                                  ? AppColors.success
+                                  : AppColors.error),
                         ),
                         8.horizontalSpace,
                         Expanded(
@@ -62,7 +74,9 @@ class MenuItemCard extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 15.sp,
                               fontWeight: FontWeight.w800,
-                              color: AppColors.textDark.withValues(alpha: 0.9),
+                              color: isAccepting
+                                  ? AppColors.textDark.withValues(alpha: 0.9)
+                                  : AppColors.textDark.withValues(alpha: 0.5),
                             ),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
@@ -76,7 +90,13 @@ class MenuItemCard extends StatelessWidget {
                       children: [
                         Text(
                           '₹${item.effectivePrice.toStringAsFixed(0)}',
-                          style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: AppColors.maroon),
+                          style: TextStyle(
+                            fontSize: 14.sp,
+                            fontWeight: FontWeight.w700,
+                            color: isAccepting
+                                ? AppColors.maroon
+                                : AppColors.maroon.withValues(alpha: 0.5),
+                          ),
                         ),
                         if (item.hasDiscount) ...[
                           8.horizontalSpace,
@@ -118,21 +138,52 @@ class MenuItemCard extends StatelessWidget {
                       width: 110.w,
                       height: 95.h,
                       color: AppColors.maroon.withValues(alpha: 0.05),
-                      child: item.imageUrl.isNotEmpty
-                          ? CachedNetworkImage(
-                              imageUrl: item.imageUrl,
-                              fit: BoxFit.cover,
-                              placeholder: (context, url) => const ShimmerLoader(child: SizedBox.expand()),
-                              errorWidget: (context, url, error) => Image.asset('assets/icons/placeholder_food.png', fit: BoxFit.cover),
-                            )
-                          : Image.asset('assets/icons/placeholder_food.png', fit: BoxFit.cover),
+                      child: Opacity(
+                        opacity: isAccepting ? 1.0 : 0.45,
+                        child: ColorFiltered(
+                          colorFilter: isAccepting
+                              ? const ColorFilter.mode(
+                                  Colors.transparent, BlendMode.multiply)
+                              : const ColorFilter.matrix(<double>[
+                                  0.2126, 0.7152, 0.0722, 0, 0,
+                                  0.2126, 0.7152, 0.0722, 0, 0,
+                                  0.2126, 0.7152, 0.0722, 0, 0,
+                                  0,      0,      0,      1, 0,
+                                ]),
+                          child: item.imageUrl.isNotEmpty
+                              ? CachedNetworkImage(
+                                  imageUrl: item.imageUrl,
+                                  fit: BoxFit.cover,
+                                  placeholder: (context, url) =>
+                                      const ShimmerLoader(
+                                          child: SizedBox.expand()),
+                                  errorWidget: (context, url, error) =>
+                                      Image.asset(
+                                          'assets/icons/placeholder_food.png',
+                                          fit: BoxFit.cover),
+                                )
+                              : Image.asset(
+                                  'assets/icons/placeholder_food.png',
+                                  fit: BoxFit.cover),
+                        ),
+                      ),
                     ),
                   ),
                   Positioned(
                     bottom: -12.h,
-                    child: item.available
-                        ? (qty == 0 ? _AddButton(item: item) : _QuantityStepper(item: item, qty: qty))
-                        : _SoldOutBadge(),
+                    child: !isAccepting
+                        ? _UnavailableBadge(
+                            text: restaurant.statusType ==
+                                    RestaurantStatusType.paused
+                                ? 'PAUSED'
+                                : 'CLOSED',
+                            reason: restaurant.unavailableReason,
+                          )
+                        : (item.available
+                            ? (qty == 0
+                                ? _AddButton(item: item)
+                                : _QuantityStepper(item: item, qty: qty))
+                            : _SoldOutBadge()),
                   ),
                 ],
               ),
@@ -158,7 +209,10 @@ class _AddButton extends StatelessWidget {
         borderRadius: BorderRadius.circular(8.r),
         border: Border.all(color: AppColors.maroon.withValues(alpha: 0.2)),
         boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8, offset: const Offset(0, 2)),
+          BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 2)),
         ],
       ),
       child: TextButton(
@@ -166,7 +220,10 @@ class _AddButton extends StatelessWidget {
         style: TextButton.styleFrom(padding: EdgeInsets.zero),
         child: Text(
           'ADD',
-          style: TextStyle(color: AppColors.maroon, fontWeight: FontWeight.w900, fontSize: 13.sp),
+          style: TextStyle(
+              color: AppColors.maroon,
+              fontWeight: FontWeight.w900,
+              fontSize: 13.sp),
         ),
       ),
     );
@@ -188,7 +245,10 @@ class _QuantityStepper extends StatelessWidget {
         color: AppColors.maroon,
         borderRadius: BorderRadius.circular(8.r),
         boxShadow: [
-          BoxShadow(color: AppColors.maroon.withValues(alpha: 0.2), blurRadius: 8, offset: const Offset(0, 3)),
+          BoxShadow(
+              color: AppColors.maroon.withValues(alpha: 0.2),
+              blurRadius: 8,
+              offset: const Offset(0, 3)),
         ],
       ),
       child: Row(
@@ -204,12 +264,16 @@ class _QuantityStepper extends StatelessWidget {
           ),
           Text(
             '$qty',
-            style: TextStyle(color: AppColors.gold, fontWeight: FontWeight.w900, fontSize: 13.sp),
+            style: TextStyle(
+                color: AppColors.gold,
+                fontWeight: FontWeight.w900,
+                fontSize: 13.sp),
           ),
           Expanded(
             child: InkWell(
               onTap: () => cart.addItem(item),
-              borderRadius: BorderRadius.horizontal(right: Radius.circular(8.r)),
+              borderRadius:
+                  BorderRadius.horizontal(right: Radius.circular(8.r)),
               child: Center(
                 child: Icon(Icons.add, color: AppColors.gold, size: 16.r),
               ),
@@ -233,7 +297,48 @@ class _SoldOutBadge extends StatelessWidget {
       ),
       child: Text(
         'SOLD OUT',
-        style: TextStyle(fontSize: 9.sp, fontWeight: FontWeight.w900, color: AppColors.maroon.withValues(alpha: 0.4)),
+        style: TextStyle(
+            fontSize: 9.sp,
+            fontWeight: FontWeight.w900,
+            color: AppColors.maroon.withValues(alpha: 0.4)),
+      ),
+    );
+  }
+}
+
+class _UnavailableBadge extends StatelessWidget {
+  final String text;
+  final String reason;
+
+  const _UnavailableBadge({required this.text, required this.reason});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: () {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ordering is currently unavailable. $reason'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      },
+      borderRadius: BorderRadius.circular(6.r),
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 5.h),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade200,
+          borderRadius: BorderRadius.circular(6.r),
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        child: Text(
+          text,
+          style: TextStyle(
+            fontSize: 9.sp,
+            fontWeight: FontWeight.w900,
+            color: Colors.grey.shade600,
+          ),
+        ),
       ),
     );
   }

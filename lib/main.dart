@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'providers/cart_provider.dart';
 import 'providers/address_provider.dart';
+import 'providers/restaurant_provider.dart';
 import 'theme/app_theme.dart';
 import 'screens/splash_screen.dart';
 import 'firebase_options.dart';
@@ -45,6 +46,7 @@ class MaruthiEatsApp extends StatelessWidget {
       builder: (_, child) {
         return MultiProvider(
           providers: [
+            ChangeNotifierProvider(create: (_) => RestaurantProvider()),
             ChangeNotifierProvider(create: (_) => CartProvider()),
             ChangeNotifierProvider(create: (_) => AddressProvider()),
           ],

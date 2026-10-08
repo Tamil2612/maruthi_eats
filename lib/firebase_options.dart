@@ -51,7 +51,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyAlnBDuqrG9DiwdarS2H2iZXhr2IzAq1bM',
-    appId: '1:119948554671:android:df08f278e1dc83d5b23f5a',
+    appId: '1:119948554671:android:6dfdd7de5e34ce23b23f5a',
     messagingSenderId: '119948554671',
     projectId: 'maruthi-eats',
     storageBucket: 'maruthi-eats.firebasestorage.app',

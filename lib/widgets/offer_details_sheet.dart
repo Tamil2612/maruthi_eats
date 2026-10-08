@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../models/offer.dart';
 import '../models/menu_item.dart';
 import '../providers/cart_provider.dart';
+import '../providers/restaurant_provider.dart';
 import '../theme/app_theme.dart';
 import 'skeleton_loaders.dart';
 
@@ -71,6 +72,8 @@ class _OfferDetailsSheetState extends State<OfferDetailsSheet> {
   @override
   Widget build(BuildContext context) {
     final offer = widget.offer;
+    final restaurant = context.watch<RestaurantProvider>();
+    final bool isAccepting = restaurant.isAcceptingOrders;
 
     return Container(
       decoration: BoxDecoration(
@@ -100,16 +103,30 @@ class _OfferDetailsSheetState extends State<OfferDetailsSheet> {
                   if (offer.imageUrl.isNotEmpty)
                     ClipRRect(
                       borderRadius: BorderRadius.circular(16.r),
-                      child: CachedNetworkImage(
-                        imageUrl: offer.imageUrl,
-                        height: 160.h,
-                        width: double.infinity,
-                        fit: BoxFit.fill,
-                        placeholder: (context, url) => ShimmerLoader(
-                            child: Container(color: Colors.white)),
-                        errorWidget: (context, url, error) => Image.asset(
-                            'assets/icons/placeholder_food.png',
-                            fit: BoxFit.cover),
+                      child: Opacity(
+                        opacity: isAccepting ? 1.0 : 0.5,
+                        child: ColorFiltered(
+                          colorFilter: isAccepting
+                              ? const ColorFilter.mode(
+                                  Colors.transparent, BlendMode.multiply)
+                              : const ColorFilter.matrix(<double>[
+                                  0.2126, 0.7152, 0.0722, 0, 0,
+                                  0.2126, 0.7152, 0.0722, 0, 0,
+                                  0.2126, 0.7152, 0.0722, 0, 0,
+                                  0,      0,      0,      1, 0,
+                                ]),
+                          child: CachedNetworkImage(
+                            imageUrl: offer.imageUrl,
+                            height: 160.h,
+                            width: double.infinity,
+                            fit: BoxFit.fill,
+                            placeholder: (context, url) => ShimmerLoader(
+                                child: Container(color: Colors.white)),
+                            errorWidget: (context, url, error) => Image.asset(
+                                'assets/icons/placeholder_food.png',
+                                fit: BoxFit.cover),
+                          ),
+                        ),
                       ),
                     ),
                   20.verticalSpace,
@@ -203,21 +220,28 @@ class _OfferDetailsSheetState extends State<OfferDetailsSheet> {
                         child: SizedBox(
                           height: 56.h,
                           child: ElevatedButton(
-                            onPressed: _loadingItems || _bogoItemsMissing
+                            onPressed: (!isAccepting ||
+                                    _loadingItems ||
+                                    _bogoItemsMissing)
                                 ? null
                                 : () {
                                     context.read<CartProvider>().addOffer(offer,
                                         buyItem: _buyItem, getItem: _getItem);
                                     Navigator.pop(context);
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
+                                      const SnackBar(
                                           content:
                                               Text('Offer added to cart!')),
                                     );
                                   },
-                            child: Text(_bogoItemsMissing
-                                ? 'UNAVAILABLE'
-                                : 'ADD TO CART'),
+                            child: Text(!isAccepting
+                                ? (restaurant.statusType ==
+                                        RestaurantStatusType.paused
+                                    ? 'TEMPORARILY UNAVAILABLE'
+                                    : 'RESTAURANT CLOSED')
+                                : (_bogoItemsMissing
+                                    ? 'UNAVAILABLE'
+                                    : 'ADD TO CART')),
                           ),
                         ),
                       ),

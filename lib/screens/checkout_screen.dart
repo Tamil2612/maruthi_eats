@@ -5,14 +5,14 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:razorpay_flutter/razorpay_flutter.dart';
 import 'package:provider/provider.dart';
 import '../providers/cart_provider.dart';
 import '../providers/address_provider.dart';
+import '../providers/restaurant_provider.dart';
 import '../services/checkout_service.dart';
+import '../services/razorpay_checkout/razorpay_payment_service.dart';
 import '../theme/app_theme.dart';
 import '../models/address_model.dart';
-import '../models/cart_item.dart';
 import 'saved_addresses_screen.dart';
 import 'order_success_screen.dart';
 
@@ -31,7 +31,6 @@ class CheckoutScreen extends StatefulWidget {
 class _CheckoutScreenState extends State<CheckoutScreen> {
   PaymentChoice _payment = PaymentChoice.upi;
   bool _placing = false;
-  late final Razorpay _razorpay;
 
   String? _pendingOrderId;
   PaymentChoice? _pendingOrderChoice;
@@ -94,18 +93,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   @override
-  void initState() {
-    super.initState();
-    _razorpay = Razorpay()
-      ..on(Razorpay.EVENT_PAYMENT_SUCCESS, _onPaymentSuccess)
-      ..on(Razorpay.EVENT_PAYMENT_ERROR, _onPaymentError)
-      ..on(Razorpay.EVENT_EXTERNAL_WALLET, _onExternalWallet);
-  }
-
-  @override
   void dispose() {
     _debounceTimer?.cancel();
-    _razorpay.clear();
     super.dispose();
   }
 
@@ -113,6 +102,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Widget build(BuildContext context) {
     final cart = context.watch<CartProvider>();
     final addressProvider = context.watch<AddressProvider>();
+    final restaurant = context.watch<RestaurantProvider>();
     final selectedAddress = addressProvider.selectedAddress;
 
     if (selectedAddress != null) {
@@ -142,6 +132,37 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (!restaurant.isAcceptingOrders) ...[
+              Container(
+                padding: EdgeInsets.symmetric(
+                    horizontal: 14.w, vertical: 10.h),
+                decoration: BoxDecoration(
+                  color: AppColors.error.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12.r),
+                  border: Border.all(
+                      color: AppColors.error.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.error_outline_rounded,
+                        color: AppColors.error, size: 20.r),
+                    10.horizontalSpace,
+                    Expanded(
+                      child: Text(
+                        'Ordering is currently unavailable (${restaurant.unavailableReason}). Checkout is disabled.',
+                        style: TextStyle(
+                          color: AppColors.error,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12.sp,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              16.verticalSpace,
+            ],
+
             // 1. Delivery Address Header & Card
             _buildSectionHeader(
               icon: Icons.location_on,
@@ -185,37 +206,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               title: 'Payment Method',
             ),
             8.verticalSpace,
-            _buildPaymentOption(
-              title: 'Pay via UPI',
-              subtitle: 'GPay, PhonePe, Paytm, BHIM & more',
-              badge: 'RECOMMENDED',
-              icon: Icons.qr_code_scanner_rounded,
-              selected: _payment == PaymentChoice.upi,
-              onTap: () => setState(() => _payment = PaymentChoice.upi),
-            ),
-            10.verticalSpace,
-            _buildPaymentOption(
-              title: 'Cash on Delivery',
-              subtitle: 'Pay cash or UPI upon delivery',
-              badge: null,
-              icon: Icons.payments_outlined,
-              selected: _payment == PaymentChoice.cod,
-              onTap: () => setState(() => _payment = PaymentChoice.cod),
-            ),
+            _buildPaymentMethodCard(),
             20.verticalSpace,
 
-            // 4. Bill Details Summary Card
+            // 4. Detailed Bill Summary
             _buildSectionHeader(
               icon: Icons.receipt_long_outlined,
-              title: 'Bill Details',
+              title: 'Bill Summary',
             ),
             8.verticalSpace,
-            _buildBillDetailsCard(cart),
-            20.verticalSpace,
-
-            // 5. Safety & Trust Note
-            _buildSafetyNote(),
-            32.verticalSpace,
+            _buildBillSummaryCard(cart),
+            80.verticalSpace, // Padding for bottom sticky bar
           ],
         ),
       ),
@@ -233,20 +234,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       children: [
         Row(
           children: [
-            Container(
-              padding: EdgeInsets.all(6.r),
-              decoration: BoxDecoration(
-                color: AppColors.maroon.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, size: 18.r, color: AppColors.maroon),
-            ),
-            10.horizontalSpace,
+            Icon(icon, size: 18.r, color: AppColors.maroon),
+            8.horizontalSpace,
             Text(
               title,
               style: TextStyle(
+                fontSize: 14.sp,
                 fontWeight: FontWeight.bold,
-                fontSize: 15.sp,
                 color: AppColors.textDark,
               ),
             ),
@@ -269,34 +263,20 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           color: AppColors.white,
           borderRadius: BorderRadius.circular(16.r),
           border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.black.withValues(alpha: 0.03),
-              blurRadius: 10.r,
-              offset: const Offset(0, 4),
-            )
-          ],
         ),
         child: Row(
           children: [
-            Container(
-              padding: EdgeInsets.all(10.r),
-              decoration: BoxDecoration(
-                color: AppColors.error.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.location_off_outlined, color: AppColors.error),
-            ),
+            Icon(Icons.error_outline, color: AppColors.error, size: 24.r),
             12.horizontalSpace,
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'No Address Selected',
+                    'No delivery address found',
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      fontSize: 14.sp,
+                      fontSize: 13.sp,
                       color: AppColors.error,
                     ),
                   ),
@@ -382,27 +362,24 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     ),
                   ],
                 ),
-                6.verticalSpace,
+                4.verticalSpace,
                 Text(
                   selectedAddress.fullAddress,
                   style: TextStyle(
-                    fontSize: 13.sp,
-                    color: AppColors.textDark.withValues(alpha: 0.7),
+                    fontSize: 12.sp,
+                    color: AppColors.grey,
                     height: 1.3,
                   ),
                 ),
-                if (selectedAddress.recipientName.isNotEmpty ||
-                    selectedAddress.recipientPhone.isNotEmpty) ...[
-                  8.verticalSpace,
-                  Text(
-                    '${selectedAddress.recipientName} • ${selectedAddress.recipientPhone}',
-                    style: TextStyle(
-                      fontSize: 11.sp,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.grey,
-                    ),
+                6.verticalSpace,
+                Text(
+                  'Contact: ${selectedAddress.recipientName} (${selectedAddress.recipientPhone})',
+                  style: TextStyle(
+                    fontSize: 11.sp,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textDark,
                   ),
-                ]
+                ),
               ],
             ),
           ),
@@ -413,469 +390,182 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Widget _buildOrderItemsCard(CartProvider cart) {
     final items = cart.items.values.toList();
-
     return Container(
-      padding: EdgeInsets.all(16.r),
       decoration: BoxDecoration(
         color: AppColors.white,
         borderRadius: BorderRadius.circular(16.r),
-        border: Border.all(color: AppColors.maroon.withValues(alpha: 0.08)),
+        border: Border.all(color: AppColors.maroon.withValues(alpha: 0.1)),
         boxShadow: [
           BoxShadow(
-            color: AppColors.black.withValues(alpha: 0.03),
-            blurRadius: 10.r,
+            color: AppColors.black.withValues(alpha: 0.04),
+            blurRadius: 12.r,
             offset: const Offset(0, 4),
           )
         ],
       ),
-      child: Column(
-        children: [
-          ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: items.length,
-            separatorBuilder: (_, __) => Divider(
-              height: 16.h,
-              color: AppColors.textDark.withValues(alpha: 0.05),
-            ),
-            itemBuilder: (context, index) {
-              final item = items[index];
-              return _buildOrderItemRow(item);
-            },
-          ),
-          if (cart.appliedCoupon != null) ...[
-            12.verticalSpace,
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-              decoration: BoxDecoration(
-                color: AppColors.success.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(10.r),
-                border: Border.all(color: AppColors.success.withValues(alpha: 0.2)),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.local_offer_outlined, color: AppColors.success, size: 16.r),
-                  8.horizontalSpace,
-                  Expanded(
-                    child: Text(
-                      'Coupon "${cart.appliedCoupon!.code}" applied! Saved ₹${cart.couponDiscount.toStringAsFixed(0)}',
-                      style: TextStyle(
-                        fontSize: 12.sp,
-                        color: AppColors.success,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildOrderItemRow(CartItem item) {
-    return Row(
-      children: [
-        // Veg / Non-Veg dot icon
-        Container(
-          width: 14.r,
-          height: 14.r,
-          padding: EdgeInsets.all(2.r),
-          decoration: BoxDecoration(
-            border: Border.all(
-              color: item.isVeg ? AppColors.success : AppColors.error,
-              width: 1.5,
-            ),
-            borderRadius: BorderRadius.circular(3.r),
-          ),
-          child: Container(
-            decoration: BoxDecoration(
-              color: item.isVeg ? AppColors.success : AppColors.error,
-              shape: BoxShape.circle,
-            ),
-          ),
+      child: ListView.separated(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+        itemCount: items.length,
+        separatorBuilder: (_, __) => Divider(
+          color: AppColors.grey.withValues(alpha: 0.15),
+          height: 16.h,
         ),
-        10.horizontalSpace,
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        itemBuilder: (context, index) {
+          final item = items[index];
+          return Row(
             children: [
-              Text(
-                item.name,
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13.sp,
-                  color: AppColors.textDark,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              if (item.offerDescription != null)
-                Text(
-                  item.offerDescription!,
-                  style: TextStyle(
-                    fontSize: 10.sp,
-                    color: AppColors.maroon,
-                    fontWeight: FontWeight.w500,
+              Container(
+                padding: EdgeInsets.all(2.r),
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: item.isVeg ? AppColors.success : AppColors.error,
+                    width: 1.w,
                   ),
+                  borderRadius: BorderRadius.circular(2.r),
                 ),
-            ],
-          ),
-        ),
-        Text(
-          'x${item.quantity}',
-          style: TextStyle(
-            fontSize: 12.sp,
-            fontWeight: FontWeight.bold,
-            color: AppColors.grey,
-          ),
-        ),
-        16.horizontalSpace,
-        Text(
-          item.isFree ? 'FREE' : '₹${item.total.toStringAsFixed(0)}',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 13.sp,
-            color: item.isFree ? AppColors.success : AppColors.textDark,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildPaymentOption({
-    required String title,
-    required String subtitle,
-    required String? badge,
-    required IconData icon,
-    required bool selected,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16.r),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: EdgeInsets.all(16.r),
-        decoration: BoxDecoration(
-          color: selected ? AppColors.maroon.withValues(alpha: 0.05) : AppColors.white,
-          borderRadius: BorderRadius.circular(16.r),
-          border: Border.all(
-            color: selected ? AppColors.maroon : AppColors.grey.withValues(alpha: 0.2),
-            width: selected ? 2.w : 1.w,
-          ),
-          boxShadow: [
-            if (selected)
-              BoxShadow(
-                color: AppColors.maroon.withValues(alpha: 0.08),
-                blurRadius: 12.r,
-                offset: const Offset(0, 4),
-              )
-            else
-              BoxShadow(
-                color: AppColors.black.withValues(alpha: 0.02),
-                blurRadius: 6.r,
-                offset: const Offset(0, 2),
-              )
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: EdgeInsets.all(10.r),
-              decoration: BoxDecoration(
-                color: selected ? AppColors.maroon : AppColors.maroon.withValues(alpha: 0.08),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                icon,
-                color: selected ? AppColors.gold : AppColors.maroon,
-                size: 22.r,
-              ),
-            ),
-            14.horizontalSpace,
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        title,
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14.sp,
-                          color: AppColors.textDark,
-                        ),
-                      ),
-                      if (badge != null) ...[
-                        8.horizontalSpace,
-                        Container(
-                          padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
-                          decoration: BoxDecoration(
-                            color: AppColors.success.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(6.r),
-                          ),
-                          child: Text(
-                            badge,
-                            style: TextStyle(
-                              color: AppColors.success,
-                              fontSize: 9.sp,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ]
-                    ],
-                  ),
-                  4.verticalSpace,
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      fontSize: 11.sp,
-                      color: AppColors.textDark.withValues(alpha: 0.6),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              width: 20.r,
-              height: 20.r,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: selected ? AppColors.maroon : AppColors.grey,
-                  width: selected ? 6.r : 1.5.r,
+                child: Icon(
+                  Icons.circle,
+                  size: 6.r,
+                  color: item.isVeg ? AppColors.success : AppColors.error,
                 ),
-                color: AppColors.white,
               ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBillDetailsCard(CartProvider cart) {
-    final double minOrderValue = cart.minimumOrderValue;
-    final bool meetsMinOrder = cart.subtotal >= minOrderValue;
-    final double shortfall = meetsMinOrder ? 0.0 : (minOrderValue - cart.subtotal);
-    final double? distanceKm = _previewData != null ? (_previewData!['distance_km'] ?? 0.0).toDouble() : null;
-    final bool isDeliverable = _previewData?['is_deliverable'] ?? true;
-    final String deliveryMsg = _previewData?['delivery_message'] ?? 'Outside delivery area';
-    final bool isAvailable = _previewData?['is_available'] ?? true;
-    final String statusMsg = _previewData?['status_message'] ?? 'Restaurant is currently unavailable';
-
-    return Container(
-      padding: EdgeInsets.all(16.r),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(16.r),
-        border: Border.all(color: AppColors.maroon.withValues(alpha: 0.08)),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.black.withValues(alpha: 0.03),
-            blurRadius: 10.r,
-            offset: const Offset(0, 4),
-          )
-        ],
-      ),
-      child: Column(
-        children: [
-          _billRow('Item Total', cart.subtotal),
-          if (cart.couponDiscount > 0) ...[
-            6.verticalSpace,
-            _billRow('Coupon Discount', -cart.couponDiscount, isDiscount: true),
-          ],
-          if (distanceKm != null && distanceKm > 0) ...[
-            6.verticalSpace,
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Delivery Distance',
-                  style: TextStyle(
-                    fontSize: 13.sp,
-                    color: AppColors.textDark.withValues(alpha: 0.7),
-                  ),
-                ),
-                Text(
-                  '${distanceKm.toStringAsFixed(1)} km',
+              10.horizontalSpace,
+              Expanded(
+                child: Text(
+                  item.name,
                   style: TextStyle(
                     fontSize: 13.sp,
                     fontWeight: FontWeight.w600,
-                    color: isDeliverable ? AppColors.textDark : AppColors.error,
+                    color: AppColors.textDark,
                   ),
-                ),
-              ],
-            ),
-          ],
-          6.verticalSpace,
-          _billRow(
-            'Delivery Fee',
-            cart.deliveryFee,
-            isFreeDelivery: cart.deliveryFee == 0,
-          ),
-          if (cart.previewFailed) ...[
-            4.verticalSpace,
-            Text(
-              'Delivery fee calculated at payment',
-              style: TextStyle(fontSize: 11.sp, color: AppColors.grey, fontStyle: FontStyle.italic),
-            ),
-          ],
-          6.verticalSpace,
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Minimum Order',
-                style: TextStyle(
-                  fontSize: 12.sp,
-                  color: AppColors.textDark.withValues(alpha: 0.6),
                 ),
               ),
               Text(
-                '₹${minOrderValue.toStringAsFixed(0)}',
+                '${item.quantity} x ₹${item.unitPrice.toStringAsFixed(0)}',
                 style: TextStyle(
                   fontSize: 12.sp,
-                  fontWeight: FontWeight.w600,
-                  color: meetsMinOrder ? AppColors.success : AppColors.error,
+                  color: AppColors.grey,
+                ),
+              ),
+              12.horizontalSpace,
+              Text(
+                '₹${item.total.toStringAsFixed(0)}',
+                style: TextStyle(
+                  fontSize: 13.sp,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textDark,
                 ),
               ),
             ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildPaymentMethodCard() {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(16.r),
+        border: Border.all(color: AppColors.maroon.withValues(alpha: 0.1)),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.black.withValues(alpha: 0.04),
+            blurRadius: 12.r,
+            offset: const Offset(0, 4),
+          )
+        ],
+      ),
+      child: Column(
+        children: [
+          RadioListTile<PaymentChoice>(
+            value: PaymentChoice.upi,
+            groupValue: _payment,
+            activeColor: AppColors.maroon,
+            onChanged: (val) {
+              if (val != null) setState(() => _payment = val);
+            },
+            title: Text(
+              'Online Payment (Razorpay / UPI / Cards)',
+              style: TextStyle(
+                fontSize: 13.sp,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textDark,
+              ),
+            ),
+            subtitle: Text(
+              'Fast & secure payment via GPay, PhonePe, Cards, NetBanking',
+              style: TextStyle(fontSize: 11.sp, color: AppColors.grey),
+            ),
+            secondary: Icon(
+              Icons.account_balance_wallet_outlined,
+              color: AppColors.maroon,
+              size: 22.r,
+            ),
           ),
-          if (!isAvailable) ...[
-            10.verticalSpace,
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-              decoration: BoxDecoration(
-                color: AppColors.error.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(8.r),
-                border: Border.all(color: AppColors.error.withValues(alpha: 0.2)),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.storefront_outlined, color: AppColors.error, size: 16.r),
-                  8.horizontalSpace,
-                  Expanded(
-                    child: Text(
-                      statusMsg,
-                      style: TextStyle(color: AppColors.error, fontSize: 12.sp, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ],
+          Divider(color: AppColors.grey.withValues(alpha: 0.15), height: 1),
+          RadioListTile<PaymentChoice>(
+            value: PaymentChoice.cod,
+            groupValue: _payment,
+            activeColor: AppColors.maroon,
+            onChanged: (val) {
+              if (val != null) setState(() => _payment = val);
+            },
+            title: Text(
+              'Cash on Delivery',
+              style: TextStyle(
+                fontSize: 13.sp,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textDark,
               ),
             ),
-          ] else if (!isDeliverable) ...[
-            10.verticalSpace,
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-              decoration: BoxDecoration(
-                color: AppColors.error.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(8.r),
-                border: Border.all(color: AppColors.error.withValues(alpha: 0.2)),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.location_off_outlined, color: AppColors.error, size: 16.r),
-                  8.horizontalSpace,
-                  Expanded(
-                    child: Text(
-                      deliveryMsg,
-                      style: TextStyle(color: AppColors.error, fontSize: 12.sp, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ],
-              ),
+            subtitle: Text(
+              'Pay with cash or UPI upon delivery',
+              style: TextStyle(fontSize: 11.sp, color: AppColors.grey),
             ),
-          ] else if (!meetsMinOrder) ...[
-            10.verticalSpace,
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-              decoration: BoxDecoration(
-                color: AppColors.error.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(8.r),
-                border: Border.all(color: AppColors.error.withValues(alpha: 0.2)),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.info_outline, color: AppColors.error, size: 16.r),
-                  8.horizontalSpace,
-                  Expanded(
-                    child: Text(
-                      'Add ₹${shortfall.toStringAsFixed(0)} more to place your order.',
-                      style: TextStyle(color: AppColors.error, fontSize: 12.sp, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ],
-              ),
+            secondary: Icon(
+              Icons.payments_outlined,
+              color: AppColors.maroon,
+              size: 22.r,
             ),
-          ],
-          if (!isDeliverable) ...[
-            10.verticalSpace,
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-              decoration: BoxDecoration(
-                color: AppColors.error.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(8.r),
-                border: Border.all(color: AppColors.error.withValues(alpha: 0.2)),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.location_off_outlined, color: AppColors.error, size: 16.r),
-                  8.horizontalSpace,
-                  Expanded(
-                    child: Text(
-                      deliveryMsg,
-                      style: TextStyle(
-                        color: AppColors.error,
-                        fontSize: 12.sp,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-          if (!meetsMinOrder) ...[
-            10.verticalSpace,
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-              decoration: BoxDecoration(
-                color: AppColors.error.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(8.r),
-                border: Border.all(color: AppColors.error.withValues(alpha: 0.2)),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.info_outline, color: AppColors.error, size: 16.r),
-                  8.horizontalSpace,
-                  Expanded(
-                    child: Text(
-                      'Add ₹${shortfall.toStringAsFixed(0)} more to place your order.',
-                      style: TextStyle(
-                        color: AppColors.error,
-                        fontSize: 12.sp,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-          8.verticalSpace,
-          Divider(color: AppColors.textDark.withValues(alpha: 0.08)),
-          8.verticalSpace,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBillSummaryCard(CartProvider cart) {
+    final double deliveryFee = _previewData?['delivery_fee']?.toDouble() ?? cart.deliveryFee;
+
+    return Container(
+      padding: EdgeInsets.all(16.r),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(16.r),
+        border: Border.all(color: AppColors.maroon.withValues(alpha: 0.1)),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.black.withValues(alpha: 0.04),
+            blurRadius: 12.r,
+            offset: const Offset(0, 4),
+          )
+        ],
+      ),
+      child: Column(
+        children: [
+          _billRow('Item Subtotal', cart.subtotal),
+          if (cart.couponDiscount > 0)
+            _billRow('Coupon Discount', -cart.couponDiscount, isDiscount: true),
+          _billRow('Delivery Fee', deliveryFee),
+          Divider(color: AppColors.grey.withValues(alpha: 0.15), height: 20.h),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Total Amount',
+                'To Pay',
                 style: TextStyle(
                   fontSize: 15.sp,
                   fontWeight: FontWeight.bold,
@@ -883,10 +573,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 ),
               ),
               Text(
-                '₹${cart.totalPayable.toStringAsFixed(0)}',
+                '₹${((cart.subtotal - cart.couponDiscount) + deliveryFee).toStringAsFixed(0)}',
                 style: TextStyle(
-                  fontSize: 18.sp,
-                  fontWeight: FontWeight.w800,
+                  fontSize: 16.sp,
+                  fontWeight: FontWeight.bold,
                   color: AppColors.maroon,
                 ),
               ),
@@ -897,60 +587,26 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
-  Widget _billRow(
-    String label,
-    double amount, {
-    bool isDiscount = false,
-    bool isFreeDelivery = false,
-  }) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 13.sp,
-            color: isDiscount ? AppColors.success : AppColors.textDark.withValues(alpha: 0.7),
-            fontWeight: isDiscount ? FontWeight.w600 : FontWeight.normal,
-          ),
-        ),
-        Text(
-          isFreeDelivery
-              ? 'FREE'
-              : '${amount < 0 ? "-" : ""}₹${amount.abs().toStringAsFixed(2)}',
-          style: TextStyle(
-            fontSize: 13.sp,
-            fontWeight: FontWeight.w600,
-            color: isDiscount || isFreeDelivery ? AppColors.success : AppColors.textDark,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSafetyNote() {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
-      decoration: BoxDecoration(
-        color: AppColors.maroon.withValues(alpha: 0.04),
-        borderRadius: BorderRadius.circular(12.r),
-      ),
+  Widget _billRow(String label, double amount, {bool isDiscount = false}) {
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: 4.h),
       child: Row(
-        mainAxisAlignment: ColorScheme.fromSeed(seedColor: AppColors.maroon).brightness ==
-                Brightness.light
-            ? MainAxisAlignment.center
-            : MainAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Icon(Icons.verified_user_outlined, color: AppColors.maroon, size: 18.r),
-          8.horizontalSpace,
-          Expanded(
-            child: Text(
-              '100% Safe Payments • Quality Assured Food',
-              style: TextStyle(
-                fontSize: 11.sp,
-                fontWeight: FontWeight.w500,
-                color: AppColors.maroon,
-              ),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12.sp,
+              color: isDiscount ? AppColors.success : AppColors.grey,
+              fontWeight: isDiscount ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+          Text(
+            '${amount < 0 ? "-" : ""}₹${amount.abs().toStringAsFixed(2)}',
+            style: TextStyle(
+              fontSize: 12.sp,
+              color: isDiscount ? AppColors.success : AppColors.textDark,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],
@@ -959,6 +615,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Widget _buildBottomPayBar(CartProvider cart) {
+    final restaurant = context.watch<RestaurantProvider>();
+    final bool isAccepting = restaurant.isAcceptingOrders;
     final double minOrderValue = cart.minimumOrderValue;
     final bool meetsMinOrder = cart.subtotal >= minOrderValue;
     final bool isDeliverable = _previewData?['is_deliverable'] ?? true;
@@ -1024,9 +682,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               child: SizedBox(
                 height: 52.h,
                 child: ElevatedButton(
-                  onPressed: (_placing || !canPlace) ? null : () => _placeOrder(context, cart),
+                  onPressed: (_placing || !canPlace || !isAccepting) ? null : () => _placeOrder(context, cart),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.maroon,
+                    backgroundColor: isAccepting ? AppColors.maroon : Colors.grey.shade400,
                     foregroundColor: AppColors.gold,
                     elevation: 2,
                     shape: RoundedRectangleBorder(
@@ -1046,21 +704,27 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Text(
-                              _payment == PaymentChoice.upi ? 'Pay via UPI' : 'Place Order',
+                              !isAccepting
+                                  ? (restaurant.statusType == RestaurantStatusType.paused
+                                      ? 'TEMPORARILY UNAVAILABLE'
+                                      : 'RESTAURANT CLOSED')
+                                  : (_payment == PaymentChoice.upi ? 'Pay via UPI' : 'Place Order'),
                               style: TextStyle(
-                                fontSize: 14.sp,
+                                fontSize: 13.sp,
                                 fontWeight: FontWeight.bold,
                                 color: AppColors.gold,
                               ),
                             ),
-                            6.horizontalSpace,
-                            Icon(
-                              _payment == PaymentChoice.upi
-                                  ? Icons.arrow_forward_rounded
-                                  : Icons.check_circle_outline,
-                              size: 18.r,
-                              color: AppColors.gold,
-                            ),
+                            if (isAccepting) ...[
+                              6.horizontalSpace,
+                              Icon(
+                                _payment == PaymentChoice.upi
+                                    ? Icons.arrow_forward_rounded
+                                    : Icons.check_circle_outline,
+                                size: 18.r,
+                                color: AppColors.gold,
+                              ),
+                            ],
                           ],
                         ),
                 ),
@@ -1074,6 +738,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Future<void> _placeOrder(BuildContext context, CartProvider cart) async {
     final selectedAddress = context.read<AddressProvider>().selectedAddress;
+    final restaurant = context.read<RestaurantProvider>();
+
+    if (!restaurant.isAcceptingOrders) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              'Ordering is currently unavailable (${restaurant.unavailableReason}).'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
 
     if (selectedAddress == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1208,9 +884,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         return;
       }
 
-      // 2b. UPI: the order stays "pending_payment" (invisible to the
-      // restaurant) until the server verifies the payment. Nothing is
-      // deleted on failure - the server expires unpaid orders by itself.
+      // 2b. Online / UPI payment via Razorpay
       final user = FirebaseAuth.instance.currentUser;
       final session =
           await functions.httpsCallable('razorpay_create_order').call({'order_id': orderId});
@@ -1219,19 +893,44 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       final amount = session.data['amount'] as int;
       final razorpayOrderId = session.data['razorpay_order_id'] as String;
 
-      _razorpay.open({
-        'key': keyId,
-        'amount': amount,
-        'order_id': razorpayOrderId,
-        'currency': 'INR',
-        'name': 'Maruthi Eats',
-        'description': 'Order #${orderId.substring(0, 6).toUpperCase()}',
-        'prefill': {
-          'contact': user?.phoneNumber ?? '',
-          'email': user?.email ?? '',
-        },
-        'timeout': 600, // seconds the customer has to finish paying
-      });
+      final options = RazorpayCheckoutOptions(
+        keyId: keyId,
+        amount: amount,
+        razorpayOrderId: razorpayOrderId,
+        appOrderId: orderId,
+        contact: user?.phoneNumber ?? '',
+        email: user?.email ?? '',
+      );
+
+      final paymentResult = await RazorpayPaymentService.openCheckout(options);
+
+      if (!mounted || !context.mounted) return;
+
+      if (!paymentResult.isSuccess) {
+        setState(() => _placing = false);
+        if (paymentResult.isDismissed) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Payment cancelled')),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(paymentResult.errorMessage ?? 'Payment failed'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+        return;
+      }
+
+      await _verifyAndCompletePayment(
+        context: context,
+        cart: cart,
+        orderId: orderId,
+        razorpayOrderId: paymentResult.razorpayOrderId!,
+        paymentId: paymentResult.paymentId!,
+        signature: paymentResult.signature!,
+      );
     } on FirebaseFunctionsException catch (e) {
       debugPrint('FirebaseFunctionsException: code=${e.code}, message=${e.message}, details=${e.details}');
       if (!context.mounted) return;
@@ -1249,31 +948,30 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
   }
 
-  /// Razorpay says the payment went through. The app can NOT mark the order
-  /// paid itself (Firestore rules forbid it, and it would be unsafe): the
-  /// server checks Razorpay's signature and only then places the order.
-  Future<void> _onPaymentSuccess(PaymentSuccessResponse response) async {
-    final orderId = _pendingOrderId;
-    if (orderId == null) {
-      if (mounted) setState(() => _placing = false);
-      return;
-    }
-
+  /// Verifies the Razorpay payment with the server (`razorpay_verify_payment`).
+  Future<void> _verifyAndCompletePayment({
+    required BuildContext context,
+    required String orderId,
+    required String razorpayOrderId,
+    required String paymentId,
+    required String signature,
+    required CartProvider cart,
+  }) async {
     String? status;
     try {
       final result = await FirebaseFunctions.instanceFor(region: _functionsRegion)
           .httpsCallable('razorpay_verify_payment')
           .call({
         'order_id': orderId,
-        'razorpay_order_id': response.orderId,
-        'razorpay_payment_id': response.paymentId,
-        'razorpay_signature': response.signature,
+        'razorpay_order_id': razorpayOrderId,
+        'razorpay_payment_id': paymentId,
+        'razorpay_signature': signature,
       });
       status = result.data['status'] as String?;
     } on FirebaseFunctionsException catch (e) {
       debugPrint('razorpay_verify_payment failed: code=${e.code}, message=${e.message}');
       if (e.code == 'permission-denied' || e.code == 'invalid-argument') {
-        if (mounted) {
+        if (mounted && context.mounted) {
           setState(() => _placing = false);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(e.message ?? 'Could not verify the payment.')),
@@ -1286,7 +984,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
 
     final paid = status == 'paid' || status == 'already_paid' || await _waitUntilPaid(orderId);
-    if (!mounted) return;
+    if (!mounted || !context.mounted) return;
     setState(() => _placing = false);
 
     if (status == 'needs_refund') {
@@ -1301,7 +999,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     _pendingOrderId = null;
     _pendingOrderChoice = null;
-    context.read<CartProvider>().clear();
+    cart.clear();
     if (!paid) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -1310,6 +1008,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         ),
       );
     }
+    if (!context.mounted) return;
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(builder: (_) => OrderSuccessScreen(orderId: orderId)),
@@ -1329,40 +1028,5 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     } catch (_) {
       return false;
     }
-  }
-
-  void _onPaymentError(PaymentFailureResponse response) async {
-    final orderId = _pendingOrderId;
-
-    // Check once more (short 3s wait) if the webhook or server confirmed payment in the background
-    if (orderId != null) {
-      final paid = await _waitUntilPaid(orderId, timeoutSeconds: 3);
-      if (paid && mounted) {
-        _pendingOrderId = null;
-        _pendingOrderChoice = null;
-        setState(() => _placing = false);
-        context.read<CartProvider>().clear();
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => OrderSuccessScreen(orderId: orderId)),
-        );
-        return;
-      }
-    }
-
-    if (!mounted) return;
-    setState(() => _placing = false);
-    final cancelled = response.code == Razorpay.PAYMENT_CANCELLED;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(cancelled
-            ? 'Payment cancelled. You can try again.'
-            : 'Payment failed: ${response.message ?? 'Please try again.'}'),
-      ),
-    );
-  }
-
-  void _onExternalWallet(ExternalWalletResponse response) {
-    if (mounted) setState(() => _placing = false);
   }
 }

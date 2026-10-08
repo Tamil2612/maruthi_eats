@@ -2,6 +2,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import '../providers/cart_provider.dart';
 import '../providers/address_provider.dart';
+import '../providers/restaurant_provider.dart';
 import '../models/cart_item.dart';
 import '../theme/app_theme.dart';
 import 'package:flutter/material.dart';
@@ -16,6 +17,7 @@ class CartScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cart = context.watch<CartProvider>();
+    final restaurant = context.watch<RestaurantProvider>();
     final items = cart.items.values.toList();
 
     return Scaffold(
@@ -26,63 +28,97 @@ class CartScreen extends StatelessWidget {
       body: items.isEmpty
           ? _buildEmptyState(context)
           : Column(
-        children: [
-          Expanded(
-            child: ListView(
-              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 16.h),
               children: [
-                // Delivery Address Shortcut
-                const _DeliveryAddressCard(),
-                24.verticalSpace,
+                Expanded(
+                  child: ListView(
+                    padding: EdgeInsets.symmetric(
+                        horizontal: 16.w, vertical: 16.h),
+                    children: [
+                      if (!restaurant.isAcceptingOrders) ...[
+                        Container(
+                          padding: EdgeInsets.symmetric(
+                              horizontal: 14.w, vertical: 10.h),
+                          decoration: BoxDecoration(
+                            color: AppColors.error.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(12.r),
+                            border: Border.all(
+                                color: AppColors.error.withValues(alpha: 0.3)),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.error_outline_rounded,
+                                  color: AppColors.error, size: 20.r),
+                              10.horizontalSpace,
+                              Expanded(
+                                child: Text(
+                                  'Ordering is currently unavailable (${restaurant.unavailableReason}). Checkout is disabled.',
+                                  style: TextStyle(
+                                    color: AppColors.error,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12.sp,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        16.verticalSpace,
+                      ],
 
-                // Cart Items
-                ...items.map((item) => _CartItemRow(item: item)),
+                      // Delivery Address Shortcut
+                      const _DeliveryAddressCard(),
+                      24.verticalSpace,
 
-                // Add More Items Button
-                TextButton.icon(
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const FullMenuScreen()),
-                  ),
-                  icon: Icon(Icons.add_circle_outline, size: 20.r, color: AppColors.maroon),
-                  label: Text(
-                    'Add more items',
-                    style: TextStyle(
-                      color: AppColors.maroon,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13.sp,
-                    ),
-                  ),
-                  style: TextButton.styleFrom(
-                    alignment: Alignment.centerLeft,
-                    padding: EdgeInsets.symmetric(vertical: 16.h),
+                      // Cart Items
+                      ...items.map((item) => _CartItemRow(item: item)),
+
+                      // Add More Items Button
+                      TextButton.icon(
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const FullMenuScreen()),
+                        ),
+                        icon: Icon(Icons.add_circle_outline,
+                            size: 20.r, color: AppColors.maroon),
+                        label: Text(
+                          'Add more items',
+                          style: TextStyle(
+                            color: AppColors.maroon,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13.sp,
+                          ),
+                        ),
+                        style: TextButton.styleFrom(
+                          alignment: Alignment.centerLeft,
+                          padding: EdgeInsets.symmetric(vertical: 16.h),
+                        ),
+                      ),
+
+                      const Divider(),
+                      24.verticalSpace,
+
+                      // Coupon Section
+                      const _CouponSection(),
+                      24.verticalSpace,
+                      const Divider(thickness: 1),
+                      24.verticalSpace,
+
+                      // Bill Details Section
+                      _BillDetails(cart: cart),
+
+                      32.verticalSpace,
+
+                      // Cancellation Policy
+                      _CancellationPolicy(),
+
+                      100.verticalSpace,
+                    ],
                   ),
                 ),
-
-                const Divider(),
-                24.verticalSpace,
-
-                // Coupon Section
-                const _CouponSection(),
-                24.verticalSpace,
-                const Divider(thickness: 1),
-                24.verticalSpace,
-
-                // Bill Details Section
-                _BillDetails(cart: cart),
-
-                32.verticalSpace,
-
-                // Cancellation Policy
-                _CancellationPolicy(),
-
-                100.verticalSpace,
+                _StickyCheckoutBar(cart: cart, restaurant: restaurant),
               ],
             ),
-          ),
-          _StickyCheckoutBar(cart: cart),
-        ],
-      ),
     );
   }
 
@@ -91,11 +127,15 @@ class CartScreen extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.shopping_cart_outlined, size: 64.r, color: AppColors.maroon.withValues(alpha: 0.2)),
+          Icon(Icons.shopping_cart_outlined,
+              size: 64.r, color: AppColors.maroon.withValues(alpha: 0.2)),
           16.verticalSpace,
           Text(
             'Your cart is empty',
-            style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w600, color: AppColors.textDark.withValues(alpha: 0.6)),
+            style: TextStyle(
+                fontSize: 16.sp,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textDark.withValues(alpha: 0.6)),
           ),
           24.verticalSpace,
           ElevatedButton(
@@ -114,7 +154,6 @@ class _CartItemRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-
     return Padding(
       padding: EdgeInsets.symmetric(vertical: 4.h),
       child: Row(
@@ -129,28 +168,41 @@ class _CartItemRow extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   text: TextSpan(
-                    style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600, color: AppColors.textDark, fontFamily: 'Poppins'),
+                    style: TextStyle(
+                        fontSize: 14.sp,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textDark,
+                        fontFamily: 'Poppins'),
                     children: [
                       TextSpan(text: item.name),
                       const WidgetSpan(child: SizedBox(width: 8)),
                       WidgetSpan(
                         alignment: PlaceholderAlignment.middle,
-                        child: item.isOffer 
-                          ? Icon(item.isFree ? Icons.card_giftcard : Icons.stars, 
-                              size: 14.r, 
-                              color: item.isFree ? AppColors.success : AppColors.gold)
-                          : Container(
-                              padding: EdgeInsets.all(2.r),
-                              decoration: BoxDecoration(
-                                border: Border.all(color: item.isVeg ? AppColors.success : AppColors.error, width: 1.w),
-                                borderRadius: BorderRadius.circular(2.r),
+                        child: item.isOffer
+                            ? Icon(
+                                item.isFree ? Icons.card_giftcard : Icons.stars,
+                                size: 14.r,
+                                color: item.isFree
+                                    ? AppColors.success
+                                    : AppColors.gold)
+                            : Container(
+                                padding: EdgeInsets.all(2.r),
+                                decoration: BoxDecoration(
+                                  border: Border.all(
+                                      color: item.isVeg
+                                          ? AppColors.success
+                                          : AppColors.error,
+                                      width: 1.w),
+                                  borderRadius: BorderRadius.circular(2.r),
+                                ),
+                                child: Icon(
+                                  Icons.circle,
+                                  size: 6.r,
+                                  color: item.isVeg
+                                      ? AppColors.success
+                                      : AppColors.error,
+                                ),
                               ),
-                              child: Icon(
-                                Icons.circle,
-                                size: 6.r,
-                                color: item.isVeg ? AppColors.success : AppColors.error,
-                              ),
-                            ),
                       ),
                     ],
                   ),
@@ -159,7 +211,10 @@ class _CartItemRow extends StatelessWidget {
                   2.verticalSpace,
                   Text(
                     item.offerDescription!,
-                    style: TextStyle(fontSize: 11.sp, color: AppColors.textDark.withValues(alpha: 0.5), height: 1.2),
+                    style: TextStyle(
+                        fontSize: 11.sp,
+                        color: AppColors.textDark.withValues(alpha: 0.5),
+                        height: 1.2),
                   ),
                 ],
               ],
@@ -176,10 +231,14 @@ class _CartItemRow extends StatelessWidget {
                   height: 40.h,
                   decoration: BoxDecoration(
                     color: AppColors.white,
-                    border: Border.all(color: AppColors.maroon.withValues(alpha: 0.2)),
+                    border: Border.all(
+                        color: AppColors.maroon.withValues(alpha: 0.2)),
                     borderRadius: BorderRadius.circular(8.r),
                     boxShadow: [
-                      BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 4, offset: const Offset(0, 2)),
+                      BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.03),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2)),
                     ],
                   ),
                   child: Row(
@@ -187,27 +246,36 @@ class _CartItemRow extends StatelessWidget {
                     children: [
                       InkWell(
                         onTap: () {
-                          final couponDropped = context.read<CartProvider>().removeOne(item.id);
+                          final couponDropped =
+                              context.read<CartProvider>().removeOne(item.id);
                           if (couponDropped) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Coupon removed as your order no longer meets its minimum value')),
+                              const SnackBar(
+                                  content: Text(
+                                      'Coupon removed as your order no longer meets its minimum value')),
                             );
                           }
                         },
                         child: Padding(
                           padding: EdgeInsets.symmetric(horizontal: 12.w),
-                          child: Icon(Icons.remove, size: 14.r, color: AppColors.maroon),
+                          child: Icon(Icons.remove,
+                              size: 14.r, color: AppColors.maroon),
                         ),
                       ),
                       Text(
                         '${item.quantity}',
-                        style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.bold, color: AppColors.maroon),
+                        style: TextStyle(
+                            fontSize: 12.sp,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.maroon),
                       ),
                       InkWell(
-                        onTap: () => context.read<CartProvider>().incrementItem(item.id),
+                        onTap: () =>
+                            context.read<CartProvider>().incrementItem(item.id),
                         child: Padding(
                           padding: EdgeInsets.symmetric(horizontal: 12.w),
-                          child: Icon(Icons.add, size: 14.r, color: AppColors.maroon),
+                          child: Icon(Icons.add,
+                              size: 14.r, color: AppColors.maroon),
                         ),
                       ),
                     ],
@@ -216,7 +284,10 @@ class _CartItemRow extends StatelessWidget {
               else
                 Text(
                   'LINKED DEAL',
-                  style: TextStyle(fontSize: 9.sp, fontWeight: FontWeight.w800, color: AppColors.success.withValues(alpha: 0.6)),
+                  style: TextStyle(
+                      fontSize: 9.sp,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.success.withValues(alpha: 0.6)),
                 ),
 
               8.verticalSpace,
@@ -236,10 +307,14 @@ class _CartItemRow extends StatelessWidget {
                     4.horizontalSpace,
                     Text(
                       'FREE',
-                      style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold, color: AppColors.success),
+                      style: TextStyle(
+                          fontSize: 13.sp,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.success),
                     ),
                   ] else ...[
-                    if (!item.isOffer && item.menuItem?.hasDiscount == true) ...[
+                    if (!item.isOffer &&
+                        item.menuItem?.hasDiscount == true) ...[
                       Text(
                         '₹${item.menuItem!.price.toStringAsFixed(0)}',
                         style: TextStyle(
@@ -252,7 +327,10 @@ class _CartItemRow extends StatelessWidget {
                     ],
                     Text(
                       '₹${item.unitPrice.toStringAsFixed(0)}',
-                      style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold, color: AppColors.maroon),
+                      style: TextStyle(
+                          fontSize: 13.sp,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.maroon),
                     ),
                   ],
                 ],
@@ -291,15 +369,21 @@ class _CouponSection extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  coupon != null ? 'Coupon "${coupon.code}" applied' : 'Apply Coupon',
-                  style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.bold),
+                  coupon != null
+                      ? 'Coupon "${coupon.code}" applied'
+                      : 'Apply Coupon',
+                  style:
+                      TextStyle(fontSize: 14.sp, fontWeight: FontWeight.bold),
                 ),
                 Text(
-                  coupon != null ? 'You saved ₹${cart.couponDiscount.toStringAsFixed(0)}' : 'Save more with available offers',
+                  coupon != null
+                      ? 'You saved ₹${cart.couponDiscount.toStringAsFixed(0)}'
+                      : 'Save more with available offers',
                   style: TextStyle(
                       fontSize: 12.sp,
-                      color: coupon != null ? AppColors.success : AppColors.textDark.withValues(alpha: 0.5)
-                  ),
+                      color: coupon != null
+                          ? AppColors.success
+                          : AppColors.textDark.withValues(alpha: 0.5)),
                 ),
               ],
             ),
@@ -309,11 +393,15 @@ class _CouponSection extends StatelessWidget {
               onPressed: () => cart.removeCoupon(),
               child: Text(
                 'REMOVE',
-                style: TextStyle(color: AppColors.error, fontWeight: FontWeight.w800, fontSize: 12.sp),
+                style: TextStyle(
+                    color: AppColors.error,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 12.sp),
               ),
             )
           else
-            Icon(Icons.arrow_forward_ios_rounded, size: 14.r, color: AppColors.textDark.withValues(alpha: 0.3)),
+            Icon(Icons.arrow_forward_ios_rounded,
+                size: 14.r, color: AppColors.textDark.withValues(alpha: 0.3)),
         ],
       ),
     );
@@ -352,7 +440,9 @@ class _BillDetails extends StatelessWidget {
                     ),
                   ),
                   4.horizontalSpace,
-                  Icon(Icons.info_outline, size: 12.r, color: AppColors.textDark.withValues(alpha: 0.4)),
+                  Icon(Icons.info_outline,
+                      size: 12.r,
+                      color: AppColors.textDark.withValues(alpha: 0.4)),
                 ],
               ),
               Text(
@@ -379,7 +469,10 @@ class _BillDetails extends StatelessWidget {
             ),
             Text(
               '₹${cart.totalPayable.toStringAsFixed(0)}',
-              style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w900, color: AppColors.maroon),
+              style: TextStyle(
+                  fontSize: 15.sp,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.maroon),
             ),
           ],
         ),
@@ -387,7 +480,8 @@ class _BillDetails extends StatelessWidget {
     );
   }
 
-  Widget _billRow(String label, double amount, {bool isInfo = false, bool isDiscount = false}) {
+  Widget _billRow(String label, double amount,
+      {bool isInfo = false, bool isDiscount = false}) {
     return Padding(
       padding: EdgeInsets.symmetric(vertical: 4.h),
       child: Row(
@@ -399,12 +493,16 @@ class _BillDetails extends StatelessWidget {
                 label,
                 style: TextStyle(
                   fontSize: 12.sp,
-                  color: isDiscount ? AppColors.success : AppColors.textDark.withValues(alpha: 0.6),
+                  color: isDiscount
+                      ? AppColors.success
+                      : AppColors.textDark.withValues(alpha: 0.6),
                 ),
               ),
               if (isInfo) ...[
                 4.horizontalSpace,
-                Icon(Icons.info_outline, size: 12.r, color: AppColors.textDark.withValues(alpha: 0.4)),
+                Icon(Icons.info_outline,
+                    size: 12.r,
+                    color: AppColors.textDark.withValues(alpha: 0.4)),
               ],
             ],
           ),
@@ -412,7 +510,9 @@ class _BillDetails extends StatelessWidget {
             '${amount < 0 ? "-" : ""}₹${amount.abs().toStringAsFixed(2)}',
             style: TextStyle(
               fontSize: 12.sp,
-              color: isDiscount ? AppColors.success : AppColors.textDark.withValues(alpha: 0.8),
+              color: isDiscount
+                  ? AppColors.success
+                  : AppColors.textDark.withValues(alpha: 0.8),
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -437,12 +537,18 @@ class _CancellationPolicy extends StatelessWidget {
         children: [
           Text(
             'Review your order and address details to avoid cancellations',
-            style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.bold, color: AppColors.textDark.withValues(alpha: 0.8)),
+            style: TextStyle(
+                fontSize: 11.sp,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textDark.withValues(alpha: 0.8)),
           ),
           8.verticalSpace,
           Text(
             'Note: If you cancel after the order is being prepared, a 100% cancellation fee will be applied.',
-            style: TextStyle(fontSize: 10.sp, color: AppColors.textDark.withValues(alpha: 0.4), height: 1.4),
+            style: TextStyle(
+                fontSize: 10.sp,
+                color: AppColors.textDark.withValues(alpha: 0.4),
+                height: 1.4),
           ),
           8.verticalSpace,
         ],
@@ -471,7 +577,10 @@ class _DeliveryAddressCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(16.r),
           border: Border.all(color: AppColors.maroon.withValues(alpha: 0.1)),
           boxShadow: [
-            BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4)),
+            BoxShadow(
+                color: Colors.black.withValues(alpha: 0.02),
+                blurRadius: 10,
+                offset: const Offset(0, 4)),
           ],
         ),
         child: Row(
@@ -482,7 +591,8 @@ class _DeliveryAddressCard extends StatelessWidget {
                 color: AppColors.maroon.withValues(alpha: 0.05),
                 shape: BoxShape.circle,
               ),
-              child: Icon(Icons.location_on, color: AppColors.maroon, size: 20.r),
+              child:
+                  Icon(Icons.location_on, color: AppColors.maroon, size: 20.r),
             ),
             16.horizontalSpace,
             Expanded(
@@ -492,16 +602,24 @@ class _DeliveryAddressCard extends StatelessWidget {
                   Row(
                     children: [
                       Text(
-                        address != null ? 'Delivering to ${address.label}' : 'Set Delivery Address',
-                        style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w800),
+                        address != null
+                            ? 'Delivering to ${address.label}'
+                            : 'Set Delivery Address',
+                        style: TextStyle(
+                            fontSize: 14.sp, fontWeight: FontWeight.w800),
                       ),
                       4.horizontalSpace,
-                      Icon(Icons.keyboard_arrow_down, size: 16.r, color: AppColors.textDark.withValues(alpha: 0.5)),
+                      Icon(Icons.keyboard_arrow_down,
+                          size: 16.r,
+                          color: AppColors.textDark.withValues(alpha: 0.5)),
                     ],
                   ),
                   Text(
-                    address?.fullAddress ?? 'Add or select an address to proceed',
-                    style: TextStyle(fontSize: 11.sp, color: AppColors.textDark.withValues(alpha: 0.5)),
+                    address?.fullAddress ??
+                        'Add or select an address to proceed',
+                    style: TextStyle(
+                        fontSize: 11.sp,
+                        color: AppColors.textDark.withValues(alpha: 0.5)),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -517,16 +635,24 @@ class _DeliveryAddressCard extends StatelessWidget {
 
 class _StickyCheckoutBar extends StatelessWidget {
   final CartProvider cart;
-  const _StickyCheckoutBar({required this.cart});
+  final RestaurantProvider restaurant;
+
+  const _StickyCheckoutBar(
+      {required this.cart, required this.restaurant});
 
   @override
   Widget build(BuildContext context) {
+    final bool isAccepting = restaurant.isAcceptingOrders;
+
     return Container(
       padding: EdgeInsets.fromLTRB(20.w, 16.h, 20.w, 32.h),
       decoration: BoxDecoration(
         color: AppColors.white,
         boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 20, offset: const Offset(0, -5)),
+          BoxShadow(
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 20,
+              offset: const Offset(0, -5)),
         ],
         borderRadius: BorderRadius.vertical(top: Radius.circular(24.r)),
       ),
@@ -540,11 +666,18 @@ class _StickyCheckoutBar extends StatelessWidget {
               children: [
                 Text(
                   '₹${cart.totalPayable.toStringAsFixed(0)}',
-                  style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w900, color: AppColors.maroon),
+                  style: TextStyle(
+                      fontSize: 18.sp,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.maroon),
                 ),
                 Text(
                   'VIEW DETAILED BILL',
-                  style: TextStyle(fontSize: 9.sp, fontWeight: FontWeight.bold, color: AppColors.gold, letterSpacing: 0.5),
+                  style: TextStyle(
+                      fontSize: 9.sp,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.gold,
+                      letterSpacing: 0.5),
                 ),
               ],
             ),
@@ -553,14 +686,27 @@ class _StickyCheckoutBar extends StatelessWidget {
               child: SizedBox(
                 height: 48.h,
                 child: ElevatedButton(
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const CheckoutScreen()),
-                  ),
+                  onPressed: isAccepting
+                      ? () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => const CheckoutScreen()),
+                          )
+                      : () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                  'Ordering is currently unavailable. ${restaurant.unavailableReason}'),
+                              backgroundColor: AppColors.error,
+                            ),
+                          );
+                        },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.maroon,
+                    backgroundColor:
+                        isAccepting ? AppColors.maroon : Colors.grey.shade400,
                     foregroundColor: AppColors.gold,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12.r)),
                     elevation: 0,
                     padding: EdgeInsets.symmetric(horizontal: 12.w),
                   ),
@@ -570,11 +716,19 @@ class _StickyCheckoutBar extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
-                          'Proceed to Checkout',
-                          style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w800),
+                          isAccepting
+                              ? 'Proceed to Checkout'
+                              : (restaurant.statusType ==
+                                      RestaurantStatusType.paused
+                                  ? 'TEMPORARILY UNAVAILABLE'
+                                  : 'RESTAURANT CLOSED'),
+                          style: TextStyle(
+                              fontSize: 13.sp, fontWeight: FontWeight.w800),
                         ),
-                        4.horizontalSpace,
-                        Icon(Icons.arrow_forward_ios_rounded, size: 12.r),
+                        if (isAccepting) ...[
+                          4.horizontalSpace,
+                          Icon(Icons.arrow_forward_ios_rounded, size: 12.r),
+                        ],
                       ],
                     ),
                   ),

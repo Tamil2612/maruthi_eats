@@ -19,8 +19,11 @@
   <title>Maruthi Eats</title>
   <link rel="manifest" href="manifest.json">
 
-  <!-- Replace this deployment placeholder with the restricted browser key. -->
+  <!-- Google Maps JS SDK -->
   <script src="https://maps.googleapis.com/maps/api/js?key={{MAPS_API_KEY}}"></script>
+
+  <!-- Razorpay Checkout.js for Web / PWA payments -->
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 
   <script>
     // Global JS Error Listener
@@ -28,6 +31,46 @@
       console.error("[GLOBAL JS ERROR]:", message, "at", source, ":", lineno, ":", colno);
       return false;
     };
+
+    function openRazorpayWebCheckout(optionsJson) {
+      try {
+        var options = JSON.parse(optionsJson);
+
+        options.handler = function(response) {
+          if (typeof window._rzpSuccess === 'function') {
+            window._rzpSuccess(
+              response.razorpay_payment_id || '',
+              response.razorpay_order_id || '',
+              response.razorpay_signature || ''
+            );
+          }
+        };
+
+        options.modal = options.modal || {};
+        options.modal.ondismiss = function() {
+          if (typeof window._rzpDismiss === 'function') {
+            window._rzpDismiss();
+          }
+        };
+
+        var rzp = new Razorpay(options);
+
+        rzp.on('payment.failed', function(response) {
+          var err = response.error || {};
+          var msg = err.description || err.reason || 'Payment failed';
+          if (typeof window._rzpError === 'function') {
+            window._rzpError(msg);
+          }
+        });
+
+        rzp.open();
+      } catch (e) {
+        console.error('Razorpay Web Checkout error:', e);
+        if (typeof window._rzpError === 'function') {
+          window._rzpError('Could not open Razorpay checkout: ' + (e.message || e));
+        }
+      }
+    }
   </script>
 </head>
 <body>

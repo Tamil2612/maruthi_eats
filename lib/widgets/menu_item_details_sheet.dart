@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 import '../models/menu_item.dart';
 import '../providers/cart_provider.dart';
+import '../providers/restaurant_provider.dart';
 import '../theme/app_theme.dart';
 import 'skeleton_loaders.dart';
 
@@ -15,7 +16,9 @@ class MenuItemDetailsSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cart = context.watch<CartProvider>();
+    final restaurant = context.watch<RestaurantProvider>();
     final qty = cart.quantityOf(item.id);
+    final bool isAccepting = restaurant.isAcceptingOrders;
 
     return Container(
       decoration: BoxDecoration(
@@ -48,22 +51,38 @@ class MenuItemDetailsSheet extends StatelessWidget {
                       width: double.infinity,
                       height: 160.h,
                       color: AppColors.maroon.withValues(alpha: 0.05),
-                      child: item.imageUrl.isNotEmpty
-                          ? CachedNetworkImage(
-                              imageUrl: item.imageUrl,
-                              fit: BoxFit.cover,
-                              placeholder: (context, url) => const ShimmerLoader(
-                                child: SizedBox.expand(),
-                              ),
-                              errorWidget: (context, url, error) => Image.asset(
-                                'assets/icons/placeholder_food.png',
-                                fit: BoxFit.cover,
-                              ),
-                            )
-                          : Image.asset(
-                              'assets/icons/placeholder_food.png',
-                              fit: BoxFit.cover,
-                            ),
+                      child: Opacity(
+                        opacity: isAccepting ? 1.0 : 0.5,
+                        child: ColorFiltered(
+                          colorFilter: isAccepting
+                              ? const ColorFilter.mode(
+                                  Colors.transparent, BlendMode.multiply)
+                              : const ColorFilter.matrix(<double>[
+                                  0.2126, 0.7152, 0.0722, 0, 0,
+                                  0.2126, 0.7152, 0.0722, 0, 0,
+                                  0.2126, 0.7152, 0.0722, 0, 0,
+                                  0,      0,      0,      1, 0,
+                                ]),
+                          child: item.imageUrl.isNotEmpty
+                              ? CachedNetworkImage(
+                                  imageUrl: item.imageUrl,
+                                  fit: BoxFit.cover,
+                                  placeholder: (context, url) =>
+                                      const ShimmerLoader(
+                                    child: SizedBox.expand(),
+                                  ),
+                                  errorWidget: (context, url, error) =>
+                                      Image.asset(
+                                    'assets/icons/placeholder_food.png',
+                                    fit: BoxFit.cover,
+                                  ),
+                                )
+                              : Image.asset(
+                                  'assets/icons/placeholder_food.png',
+                                  fit: BoxFit.cover,
+                                ),
+                        ),
+                      ),
                     ),
                   ),
                   24.verticalSpace,
@@ -77,7 +96,9 @@ class MenuItemDetailsSheet extends StatelessWidget {
                         padding: EdgeInsets.all(3.r),
                         decoration: BoxDecoration(
                           border: Border.all(
-                            color: item.isVeg ? AppColors.success : AppColors.error,
+                            color: item.isVeg
+                                ? AppColors.success
+                                : AppColors.error,
                             width: 1.5.w,
                           ),
                           borderRadius: BorderRadius.circular(4.r),
@@ -85,7 +106,8 @@ class MenuItemDetailsSheet extends StatelessWidget {
                         child: Icon(
                           Icons.circle,
                           size: 10.r,
-                          color: item.isVeg ? AppColors.success : AppColors.error,
+                          color:
+                              item.isVeg ? AppColors.success : AppColors.error,
                         ),
                       ),
                       12.horizontalSpace,
@@ -105,7 +127,8 @@ class MenuItemDetailsSheet extends StatelessWidget {
 
                   // Category Badge
                   Container(
-                    padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+                    padding:
+                        EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
                     decoration: BoxDecoration(
                       color: AppColors.maroon.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(8.r),
@@ -181,89 +204,131 @@ class MenuItemDetailsSheet extends StatelessWidget {
                   Row(
                     children: [
                       Expanded(
-                        child: item.available
-                            ? (qty == 0
-                                ? SizedBox(
-                                    height: 46.h,
-                                    child: OutlinedButton(
-                                      onPressed: () => context.read<CartProvider>().addItem(item),
-                                      style: OutlinedButton.styleFrom(
-                                        backgroundColor: AppColors.white,
-                                        foregroundColor: AppColors.maroon,
-                                        side: const BorderSide(color: AppColors.maroon, width: 1.5),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(12.r),
-                                        ),
-                                        padding: EdgeInsets.zero,
-                                      ),
-                                      child: Text(
-                                        'ADD TO CART',
-                                        style: TextStyle(
-                                          fontSize: 14.sp,
-                                          fontWeight: FontWeight.w900,
-                                          letterSpacing: 0.5,
-                                        ),
-                                      ),
-                                    ),
-                                  )
-                                : Container(
-                                    height: 46.h,
-                                    padding: EdgeInsets.symmetric(horizontal: 16.w),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.maroon,
-                                      borderRadius: BorderRadius.circular(12.r),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: AppColors.maroon.withValues(alpha: 0.3),
-                                          blurRadius: 10,
-                                          offset: const Offset(0, 4),
-                                        ),
-                                      ],
-                                    ),
-                                    child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        IconButton(
-                                          onPressed: () => cart.removeOne(item.id),
-                                          icon: Icon(Icons.remove, color: AppColors.gold, size: 22.r),
-                                          padding: EdgeInsets.zero,
-                                          constraints: const BoxConstraints(),
-                                        ),
-                                        Text(
-                                          '$qty',
-                                          style: TextStyle(
-                                            color: AppColors.gold,
-                                            fontWeight: FontWeight.w900,
-                                            fontSize: 18.sp,
-                                          ),
-                                        ),
-                                        IconButton(
-                                          onPressed: () => cart.addItem(item),
-                                          icon: Icon(Icons.add, color: AppColors.gold, size: 22.r),
-                                          padding: EdgeInsets.zero,
-                                          constraints: const BoxConstraints(),
-                                        ),
-                                      ],
-                                    ),
-                                  ))
-                            : Container(
+                        child: !isAccepting
+                            ? Container(
                                 width: double.infinity,
                                 height: 46.h,
                                 alignment: Alignment.center,
                                 decoration: BoxDecoration(
                                   color: Colors.grey.shade100,
                                   borderRadius: BorderRadius.circular(12.r),
-                                  border: Border.all(color: Colors.grey.shade200),
+                                  border:
+                                      Border.all(color: Colors.grey.shade200),
                                 ),
                                 child: Text(
-                                  'OUT OF STOCK',
+                                  restaurant.statusType ==
+                                          RestaurantStatusType.paused
+                                      ? 'TEMPORARILY UNAVAILABLE'
+                                      : 'RESTAURANT CLOSED',
                                   style: TextStyle(
-                                    fontSize: 14.sp,
+                                    fontSize: 13.sp,
                                     fontWeight: FontWeight.w900,
-                                    color: Colors.grey.shade400,
+                                    color: Colors.grey.shade500,
                                   ),
                                 ),
-                              ),
+                              )
+                            : (item.available
+                                ? (qty == 0
+                                    ? SizedBox(
+                                        height: 46.h,
+                                        child: OutlinedButton(
+                                          onPressed: () => context
+                                              .read<CartProvider>()
+                                              .addItem(item),
+                                          style: OutlinedButton.styleFrom(
+                                            backgroundColor: AppColors.white,
+                                            foregroundColor: AppColors.maroon,
+                                            side: const BorderSide(
+                                                color: AppColors.maroon,
+                                                width: 1.5),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(12.r),
+                                            ),
+                                            padding: EdgeInsets.zero,
+                                          ),
+                                          child: Text(
+                                            'ADD TO CART',
+                                            style: TextStyle(
+                                              fontSize: 14.sp,
+                                              fontWeight: FontWeight.w900,
+                                              letterSpacing: 0.5,
+                                            ),
+                                          ),
+                                        ),
+                                      )
+                                    : Container(
+                                        height: 46.h,
+                                        padding: EdgeInsets.symmetric(
+                                            horizontal: 16.w),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.maroon,
+                                          borderRadius:
+                                              BorderRadius.circular(12.r),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: AppColors.maroon
+                                                  .withValues(alpha: 0.3),
+                                              blurRadius: 10,
+                                              offset: const Offset(0, 4),
+                                            ),
+                                          ],
+                                        ),
+                                        child: Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            IconButton(
+                                              onPressed: () =>
+                                                  cart.removeOne(item.id),
+                                              icon: Icon(Icons.remove,
+                                                  color: AppColors.gold,
+                                                  size: 22.r),
+                                              padding: EdgeInsets.zero,
+                                              constraints:
+                                                  const BoxConstraints(),
+                                            ),
+                                            Text(
+                                              '$qty',
+                                              style: TextStyle(
+                                                color: AppColors.gold,
+                                                fontWeight: FontWeight.w900,
+                                                fontSize: 18.sp,
+                                              ),
+                                            ),
+                                            IconButton(
+                                              onPressed: () =>
+                                                  cart.addItem(item),
+                                              icon: Icon(Icons.add,
+                                                  color: AppColors.gold,
+                                                  size: 22.r),
+                                              padding: EdgeInsets.zero,
+                                              constraints:
+                                                  const BoxConstraints(),
+                                            ),
+                                          ],
+                                        ),
+                                      ))
+                                : Container(
+                                    width: double.infinity,
+                                    height: 46.h,
+                                    alignment: Alignment.center,
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey.shade100,
+                                      borderRadius:
+                                          BorderRadius.circular(12.r),
+                                      border: Border.all(
+                                          color: Colors.grey.shade200),
+                                    ),
+                                    child: Text(
+                                      'OUT OF STOCK',
+                                      style: TextStyle(
+                                        fontSize: 14.sp,
+                                        fontWeight: FontWeight.w900,
+                                        color: Colors.grey.shade400,
+                                      ),
+                                    ),
+                                  )),
                       ),
                     ],
                   ),

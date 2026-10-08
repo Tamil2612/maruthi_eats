@@ -7,8 +7,6 @@ import '../widgets/live_order_tracker.dart';
 import '../widgets/skeleton_loaders.dart';
 import '../widgets/offer_details_sheet.dart';
 import '../widgets/restaurant_status_banner.dart';
-import '../services/restaurant_service.dart';
-import '../models/restaurant_settings.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'full_menu_screen.dart';
 import '../models/offer.dart';
@@ -27,7 +25,8 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _bannersStream = FirebaseFirestore.instance.collection('banners').snapshots();
+    _bannersStream =
+        FirebaseFirestore.instance.collection('banners').snapshots();
     _offersStream = FirebaseFirestore.instance.collection('offers').snapshots();
   }
 
@@ -43,13 +42,7 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // StreamBuilder<RestaurantSettings>(
-                //   stream: RestaurantService().streamSettings(),
-                //   builder: (context, snapshot) {
-                //     final settings = snapshot.data ?? RestaurantSettings.defaultSettings();
-                //     return RestaurantStatusBanner(settings: settings);
-                //   },
-                // ),
+                const RestaurantStatusBanner(),
                 8.verticalSpace,
                 // // Banner Carousel
                 _buildBannerCarousel(),
@@ -117,7 +110,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-
   Widget _buildBannerCarousel() {
     return StreamBuilder<QuerySnapshot>(
       stream: _bannersStream,
@@ -126,9 +118,10 @@ class _HomeScreenState extends State<HomeScreen> {
           stream: _offersStream,
           builder: (context, offerSnapshot) {
             // Show skeleton only on initial load when we have NO data from either stream
-            final bool isInitialLoading = bannerSnapshot.connectionState == ConnectionState.waiting &&
-                offerSnapshot.connectionState == ConnectionState.waiting;
-            
+            final bool isInitialLoading =
+                bannerSnapshot.connectionState == ConnectionState.waiting &&
+                    offerSnapshot.connectionState == ConnectionState.waiting;
+
             if (isInitialLoading) {
               return const BannerSkeleton();
             }
@@ -136,14 +129,16 @@ class _HomeScreenState extends State<HomeScreen> {
             List<Map<String, dynamic>> combinedData = [];
 
             // 1. Add Network Banners
-            if (bannerSnapshot.hasData && bannerSnapshot.data!.docs.isNotEmpty) {
+            if (bannerSnapshot.hasData &&
+                bannerSnapshot.data!.docs.isNotEmpty) {
               combinedData.addAll(bannerSnapshot.data!.docs.map((doc) {
                 final data = doc.data() as Map<String, dynamic>;
                 return {
                   'item_type': 'banner',
                   'type': 'network',
                   'url': data['image_url'],
-                  'is_coupon': data.containsKey('coupon_code') || data['type'] == 'coupon',
+                  'is_coupon': data.containsKey('coupon_code') ||
+                      data['type'] == 'coupon',
                   'data': data,
                 };
               }));
@@ -152,9 +147,13 @@ class _HomeScreenState extends State<HomeScreen> {
             // 2. Add Active Offers
             if (offerSnapshot.hasData && offerSnapshot.data!.docs.isNotEmpty) {
               final offers = offerSnapshot.data!.docs
-                  .map((doc) => OfferModel.fromFirestore(doc.id, doc.data() as Map<String, dynamic>))
-                  .where((o) => o.isActive) // Filter inactive in code to handle missing fields in DB
-                  .where((o) => o.expiryDate == null || o.expiryDate!.isAfter(DateTime.now()))
+                  .map((doc) => OfferModel.fromFirestore(
+                      doc.id, doc.data() as Map<String, dynamic>))
+                  .where((o) => o
+                      .isActive) // Filter inactive in code to handle missing fields in DB
+                  .where((o) =>
+                      o.expiryDate == null ||
+                      o.expiryDate!.isAfter(DateTime.now()))
                   .toList();
 
               combinedData.addAll(offers.map((offer) => {
@@ -168,9 +167,24 @@ class _HomeScreenState extends State<HomeScreen> {
             // 3. Fallback to local banners if NO network data is found after loading
             if (combinedData.isEmpty) {
               combinedData = [
-                {'item_type': 'banner', 'type': 'local', 'path': 'assets/banners/banner_one.png', 'is_coupon': false},
-                {'item_type': 'banner', 'type': 'local', 'path': 'assets/banners/banner_two.png', 'is_coupon': false},
-                {'item_type': 'banner', 'type': 'local', 'path': 'assets/banners/banner_three.png', 'is_coupon': false},
+                {
+                  'item_type': 'banner',
+                  'type': 'local',
+                  'path': 'assets/banners/banner_one.png',
+                  'is_coupon': false
+                },
+                {
+                  'item_type': 'banner',
+                  'type': 'local',
+                  'path': 'assets/banners/banner_two.png',
+                  'is_coupon': false
+                },
+                {
+                  'item_type': 'banner',
+                  'type': 'local',
+                  'path': 'assets/banners/banner_three.png',
+                  'is_coupon': false
+                },
               ];
             }
 
