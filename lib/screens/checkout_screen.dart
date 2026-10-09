@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -32,8 +33,22 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   PaymentChoice _payment = PaymentChoice.upi;
   bool _placing = false;
 
+  // An order created on the server but not paid yet. It is only reused for a
+  // retry if the cart, coupon, address and payment choice are exactly the same;
+  // otherwise the customer would pay for an old, different order.
   String? _pendingOrderId;
-  PaymentChoice? _pendingOrderChoice;
+  String? _pendingOrderSignature;
+
+  String _orderSignature(CartProvider cart, AddressModel address) {
+    return jsonEncode({
+      'items': cart.items.values.map((c) => c.toOrderMap()).toList(),
+      'coupon': cart.appliedCoupon?.code,
+      'address': address.fullAddress,
+      'lat': address.latitude,
+      'lng': address.longitude,
+      'payment': _payment.name,
+    });
+  }
 
   Map<String, dynamic>? _previewData;
   String? _lastPreviewAddressId;
@@ -252,10 +267,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Widget _buildAddressSection(
-    BuildContext context,
-    AddressModel? selectedAddress,
-    List<AddressModel> allAddresses,
-  ) {
+      BuildContext context,
+      AddressModel? selectedAddress,
+      List<AddressModel> allAddresses,
+      ) {
     if (allAddresses.isEmpty) {
       return Container(
         padding: EdgeInsets.all(16.r),
@@ -693,40 +708,40 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   ),
                   child: _placing
                       ? SizedBox(
-                          height: 22.h,
-                          width: 22.w,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2.5.w,
-                            color: AppColors.gold,
-                          ),
-                        )
+                    height: 22.h,
+                    width: 22.w,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5.w,
+                      color: AppColors.gold,
+                    ),
+                  )
                       : Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              !isAccepting
-                                  ? (restaurant.statusType == RestaurantStatusType.paused
-                                      ? 'TEMPORARILY UNAVAILABLE'
-                                      : 'RESTAURANT CLOSED')
-                                  : (_payment == PaymentChoice.upi ? 'Pay via UPI' : 'Place Order'),
-                              style: TextStyle(
-                                fontSize: 13.sp,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.gold,
-                              ),
-                            ),
-                            if (isAccepting) ...[
-                              6.horizontalSpace,
-                              Icon(
-                                _payment == PaymentChoice.upi
-                                    ? Icons.arrow_forward_rounded
-                                    : Icons.check_circle_outline,
-                                size: 18.r,
-                                color: AppColors.gold,
-                              ),
-                            ],
-                          ],
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        !isAccepting
+                            ? (restaurant.statusType == RestaurantStatusType.paused
+                            ? 'TEMPORARILY UNAVAILABLE'
+                            : 'RESTAURANT CLOSED')
+                            : (_payment == PaymentChoice.upi ? 'Pay via UPI' : 'Place Order'),
+                        style: TextStyle(
+                          fontSize: 13.sp,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.gold,
                         ),
+                      ),
+                      if (isAccepting) ...[
+                        6.horizontalSpace,
+                        Icon(
+                          _payment == PaymentChoice.upi
+                              ? Icons.arrow_forward_rounded
+                              : Icons.check_circle_outline,
+                          size: 18.r,
+                          color: AppColors.gold,
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -836,8 +851,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             title: const Text('Order Total Updated'),
             content: Text(
               'The final order total from the server is ₹${calculatedServerTotal.toStringAsFixed(0)} '
-              '(Delivery Fee: ₹${preview.deliveryFee.toStringAsFixed(0)}).\n\n'
-              'Do you want to proceed?',
+                  '(Delivery Fee: ₹${preview.deliveryFee.toStringAsFixed(0)}).\n\n'
+                  'Do you want to proceed?',
             ),
             actions: [
               TextButton(
@@ -860,8 +875,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
       // 2. Place order on the server (authoritative creation)
       final functions = FirebaseFunctions.instanceFor(region: _functionsRegion);
+      final signature = _orderSignature(cart, selectedAddress);
       String orderId;
-      if (_pendingOrderId != null && _pendingOrderChoice == _payment) {
+      if (_pendingOrderId != null && _pendingOrderSignature == signature) {
         orderId = _pendingOrderId!;
       } else {
         final result = await functions.httpsCallable('place_order').call({
@@ -876,13 +892,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
         orderId = result.data['order_id'] as String;
         _pendingOrderId = orderId;
-        _pendingOrderChoice = _payment;
+        _pendingOrderSignature = signature;
       }
 
       // 2a. Cash on delivery: the order is already placed.
       if (_payment == PaymentChoice.cod) {
         _pendingOrderId = null;
-        _pendingOrderChoice = null;
+        _pendingOrderSignature = null;
         cart.clear();
         if (!context.mounted) return;
         setState(() => _placing = false);
@@ -895,7 +911,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
       // 2b. Online / UPI payment via Razorpay
       final session =
-          await functions.httpsCallable('razorpay_create_order').call({'order_id': orderId});
+      await functions.httpsCallable('razorpay_create_order').call({'order_id': orderId});
 
       final keyId = session.data['key_id'] as String;
       final amount = session.data['amount'] as int;
@@ -910,13 +926,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         email: currentUser.email ?? '',
       );
 
-      setState(() => _placing = false);
-
+      // _placing stays true while the Razorpay sheet is open so the Pay button
+      // cannot be tapped twice; it is reset on every exit that stays on this screen.
       final paymentResult = await RazorpayPaymentService.openCheckout(options);
 
       if (!mounted || !context.mounted) return;
 
       if (!paymentResult.isSuccess) {
+        setState(() => _placing = false);
         if (paymentResult.isDismissed) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Payment cancelled')),
@@ -939,7 +956,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       final sig = paymentResult.signature ?? '';
 
       _pendingOrderId = null;
-      _pendingOrderChoice = null;
+      _pendingOrderSignature = null;
 
       Navigator.pushReplacement(
         context,

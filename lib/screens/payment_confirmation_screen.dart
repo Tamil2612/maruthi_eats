@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:provider/provider.dart';
 import 'package:lottie/lottie.dart';
@@ -30,7 +31,20 @@ class PaymentConfirmationScreen extends StatefulWidget {
 }
 
 class _PaymentConfirmationScreenState extends State<PaymentConfirmationScreen> {
+  // The bank / Razorpay can take a few seconds to settle a payment, and the
+  // network can blip. Retry quietly a few times before bothering the customer.
+  static const int _maxAutoAttempts = 4;
+  static const Duration _retryDelay = Duration(seconds: 3);
+  static const Set<String> _retryableCodes = {
+    'unavailable',
+    'deadline-exceeded',
+    'internal',
+    'aborted',
+  };
+
   bool _isVerifying = true;
+  // true = a real problem (red icon); false = "still confirming" (calm icon).
+  bool _isHardError = false;
   String _statusMessage = "Please don't close the app. We're verifying your payment.";
   String _title = "Confirming your payment";
 
@@ -40,84 +54,139 @@ class _PaymentConfirmationScreenState extends State<PaymentConfirmationScreen> {
     _verifyPayment();
   }
 
-  Future<void> _verifyPayment() async {
+  void _showState({
+    required String title,
+    required String message,
+    bool verifying = false,
+    bool hardError = false,
+  }) {
+    if (!mounted) return;
     setState(() {
-      _isVerifying = true;
-      _title = "Confirming your payment";
-      _statusMessage = "Please don't close the app. We're verifying your payment.";
+      _isVerifying = verifying;
+      _isHardError = hardError;
+      _title = title;
+      _statusMessage = message;
     });
+  }
 
+  /// The webhook may have confirmed the payment while the app was retrying.
+  Future<bool> _isPaidInFirestore() async {
     try {
-      final result = await FirebaseFunctions.instanceFor(region: _functionsRegion)
-          .httpsCallable('razorpay_verify_payment')
-          .call({
-        'order_id': widget.orderId,
-        'razorpay_order_id': widget.razorpayOrderId,
-        'razorpay_payment_id': widget.paymentId,
-        'razorpay_signature': widget.signature,
-      }).timeout(const Duration(seconds: 25));
+      final snap = await FirebaseFirestore.instance
+          .collection('orders')
+          .doc(widget.orderId)
+          .get();
+      final data = snap.data();
+      return data != null &&
+          data['payment_status'] == 'paid' &&
+          data['order_status'] != 'pending_payment';
+    } catch (_) {
+      return false;
+    }
+  }
 
-      final data = Map<String, dynamic>.from(result.data as Map);
-      final status = data['status'] as String?;
+  Future<void> _onPaid() async {
+    if (!mounted) return;
+    _showState(
+      title: "Payment Confirmed!",
+      message: "Order placed successfully.",
+      verifying: true,
+    );
 
-      if (!mounted) return;
+    // Clear cart ONLY after the backend has confirmed the payment.
+    context.read<CartProvider>().clear();
 
-      if (status == 'paid' || status == 'already_paid') {
-        setState(() {
-          _title = "Payment Confirmed!";
-          _statusMessage = "Order placed successfully.";
-        });
+    // Brief delay to show success state before navigating
+    await Future.delayed(const Duration(milliseconds: 800));
+    if (!mounted) return;
 
-        // Clear cart ONLY after successful backend verification
-        context.read<CartProvider>().clear();
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => OrderSuccessScreen(orderId: widget.orderId),
+      ),
+    );
+  }
 
-        // Brief delay to show success state before navigating
-        await Future.delayed(const Duration(milliseconds: 800));
+  Future<void> _verifyPayment() async {
+    _showState(
+      title: "Confirming your payment",
+      message: "Please don't close the app. We're verifying your payment.",
+      verifying: true,
+    );
+
+    for (var attempt = 1; attempt <= _maxAutoAttempts; attempt++) {
+      try {
+        final result = await FirebaseFunctions.instanceFor(region: _functionsRegion)
+            .httpsCallable('razorpay_verify_payment')
+            .call({
+          'order_id': widget.orderId,
+          'razorpay_order_id': widget.razorpayOrderId,
+          'razorpay_payment_id': widget.paymentId,
+          'razorpay_signature': widget.signature,
+        }).timeout(const Duration(seconds: 25));
+
+        final data = Map<String, dynamic>.from(result.data as Map);
+        final status = data['status'] as String?;
+
         if (!mounted) return;
 
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => OrderSuccessScreen(orderId: widget.orderId),
-          ),
-        );
-      } else if (status == 'needs_refund') {
-        setState(() {
-          _isVerifying = false;
-          _title = "Payment Timeout / Refund Required";
-          _statusMessage = "Your payment arrived after the order timed out. It will be refunded - please place the order again.";
-        });
-        // Cart is NOT cleared!
-      } else {
-        setState(() {
-          _isVerifying = false;
-          _title = "Verification Pending";
-          _statusMessage = "Payment received, but confirmation is processing. Please check Your Orders.";
-        });
-        // Cart is NOT cleared!
+        if (status == 'paid' || status == 'already_paid') {
+          await _onPaid();
+          return;
+        }
+
+        if (status == 'needs_refund') {
+          // Cart is NOT cleared: the customer has to place the order again.
+          _showState(
+            title: "Payment Timeout / Refund Required",
+            message: "Your payment arrived after the order timed out. "
+                "It will be refunded - please place the order again.",
+            hardError: true,
+          );
+          return;
+        }
+        // 'pending' (still settling) or anything unexpected: keep waiting below.
+      } on FirebaseFunctionsException catch (e) {
+        if (!mounted) return;
+        if (!_retryableCodes.contains(e.code)) {
+          // Cart is NOT cleared. Money may have been taken, so say so clearly.
+          _showState(
+            title: "Verification Failed",
+            message: e.message ?? "Server error during payment verification.",
+            hardError: true,
+          );
+          return;
+        }
+      } on TimeoutException {
+        // Slow network: try again below.
+      } catch (_) {
+        // Network blip: try again below.
       }
-    } on TimeoutException {
+
       if (!mounted) return;
-      setState(() {
-        _isVerifying = false;
-        _title = "We're still checking your payment";
-        _statusMessage = "Network timeout while verifying. Your payment is safe. Please retry or check status.";
-      });
-    } on FirebaseFunctionsException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _isVerifying = false;
-        _title = "Verification Failed";
-        _statusMessage = e.message ?? "Server error during payment verification.";
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _isVerifying = false;
-        _title = "Verification Error";
-        _statusMessage = "Could not verify payment: $e";
-      });
+      if (await _isPaidInFirestore()) {
+        await _onPaid();
+        return;
+      }
+
+      if (attempt < _maxAutoAttempts) {
+        _showState(
+          title: "Confirming your payment",
+          message: "Still waiting for your bank to confirm... ($attempt/$_maxAutoAttempts)",
+          verifying: true,
+        );
+        await Future.delayed(_retryDelay);
+        if (!mounted) return;
+      }
     }
+
+    // Cart is NOT cleared. The server keeps confirming in the background.
+    _showState(
+      title: "We're still confirming your payment",
+      message: "Your payment is safe. It can take a minute to confirm. "
+          "Tap 'Check again', or look in Your Orders shortly.",
+    );
   }
 
   @override
@@ -143,13 +212,16 @@ class _PaymentConfirmationScreenState extends State<PaymentConfirmationScreen> {
                   Container(
                     padding: EdgeInsets.all(20.r),
                     decoration: BoxDecoration(
-                      color: AppColors.error.withValues(alpha: 0.1),
+                      color: (_isHardError ? AppColors.error : AppColors.maroon)
+                          .withValues(alpha: 0.1),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
-                      Icons.error_outline_rounded,
+                      _isHardError
+                          ? Icons.error_outline_rounded
+                          : Icons.hourglass_top_rounded,
                       size: 64.r,
-                      color: AppColors.error,
+                      color: _isHardError ? AppColors.error : AppColors.maroon,
                     ),
                   ),
                 32.verticalSpace,
@@ -213,7 +285,7 @@ class _PaymentConfirmationScreenState extends State<PaymentConfirmationScreen> {
                         ),
                       ),
                       child: Text(
-                        'Retry Verification / Check Status',
+                        'Check again',
                         style: TextStyle(
                           fontSize: 14.sp,
                           fontWeight: FontWeight.bold,
@@ -229,7 +301,7 @@ class _PaymentConfirmationScreenState extends State<PaymentConfirmationScreen> {
                         MaterialPageRoute(
                           builder: (_) => const OrderHistoryScreen(),
                         ),
-                        (route) => route.isFirst,
+                            (route) => route.isFirst,
                       );
                     },
                     child: Text(
