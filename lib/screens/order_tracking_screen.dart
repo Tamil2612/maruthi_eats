@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:intl/intl.dart';
 import '../models/order.dart';
 import '../theme/app_theme.dart';
@@ -797,13 +798,20 @@ class _DeliveredOrderViewState extends State<_DeliveredOrderView> {
   Future<void> _submitRating(String orderId) async {
     setState(() => _submittingRating = true);
     try {
-      await FirebaseFirestore.instance
-          .collection('orders')
-          .doc(orderId)
-          .update({
-        'rating': _rating,
-      });
+      // Orders can no longer be edited from the app (Firestore rules), so the rating
+      // goes through the server, which also checks that the order is yours.
+      await FirebaseFunctions.instanceFor(region: 'asia-south1')
+          .httpsCallable('submit_order_rating')
+          .call({'order_id': orderId, 'rating': _rating});
       if (mounted) setState(() => _ratingSubmitted = true);
+    } on FirebaseFunctionsException catch (e) {
+      if (mounted) {
+        setState(() => _submittingRating = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text(e.message ?? 'Could not submit rating. Please try again.')),
+        );
+      }
     } catch (_) {
       if (mounted) {
         setState(() => _submittingRating = false);

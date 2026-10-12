@@ -53,12 +53,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Map<String, dynamic>? _previewData;
   String? _lastPreviewAddressId;
   double? _lastPreviewSubtotal;
+  String?
+      _lastPreviewCoupon; // applying/removing a coupon must refresh the preview
   CheckoutPreviewResult? _lastPreview;
   DateTime? _lastPreviewAt;
   Timer? _debounceTimer;
 
   void _schedulePreviewFetch(AddressModel address, double subtotal) {
-    if (_lastPreviewAddressId == address.id && _lastPreviewSubtotal == subtotal) return;
+    final coupon = context.read<CartProvider>().appliedCoupon?.code;
+    if (_lastPreviewAddressId == address.id &&
+        _lastPreviewSubtotal == subtotal &&
+        _lastPreviewCoupon == coupon) {
+      return;
+    }
     _debounceTimer?.cancel();
     _debounceTimer = Timer(const Duration(milliseconds: 300), () {
       _fetchPreview(address, subtotal);
@@ -72,7 +79,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final at = _lastPreviewAt;
     final preview = _lastPreview;
     if (preview == null || at == null) return null;
-    if (_lastPreviewAddressId != address.id || _lastPreviewSubtotal != subtotal) return null;
+    if (_lastPreviewAddressId != address.id || _lastPreviewSubtotal != subtotal)
+      return null;
+    if (_lastPreviewCoupon != context.read<CartProvider>().appliedCoupon?.code)
+      return null;
     if (DateTime.now().difference(at) > const Duration(minutes: 2)) return null;
     return preview;
   }
@@ -80,6 +90,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Future<void> _fetchPreview(AddressModel address, double subtotal) async {
     _lastPreviewAddressId = address.id;
     _lastPreviewSubtotal = subtotal;
+    _lastPreviewCoupon = context.read<CartProvider>().appliedCoupon?.code;
     _lastPreview = null;
 
     try {
@@ -94,7 +105,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       _lastPreviewAt = DateTime.now();
 
       if (mounted) {
-        if (!preview.couponValid && preview.couponError != null && cart.appliedCoupon != null) {
+        if (!preview.couponValid &&
+            preview.couponError != null &&
+            cart.appliedCoupon != null) {
           final errorMsg = preview.couponError!;
           cart.removeCoupon();
           ScaffoldMessenger.of(context).showSnackBar(
@@ -121,18 +134,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         });
 
         context.read<CartProvider>().setPreviewResult(
-          deliveryFee: preview.deliveryFee,
-          minimumOrderValue: preview.minimumOrderValue,
-          failed: false,
-        );
+              deliveryFee: preview.deliveryFee,
+              minimumOrderValue: preview.minimumOrderValue,
+              failed: false,
+            );
       }
     } catch (_) {
       if (mounted) {
         context.read<CartProvider>().setPreviewResult(
-          deliveryFee: 30.0,
-          minimumOrderValue: 150.0,
-          failed: true,
-        );
+              deliveryFee: 30.0,
+              minimumOrderValue: 150.0,
+              failed: true,
+            );
       }
     }
   }
@@ -179,13 +192,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           children: [
             if (!restaurant.isAcceptingOrders) ...[
               Container(
-                padding: EdgeInsets.symmetric(
-                    horizontal: 14.w, vertical: 10.h),
+                padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
                 decoration: BoxDecoration(
                   color: AppColors.error.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(12.r),
-                  border: Border.all(
-                      color: AppColors.error.withValues(alpha: 0.3)),
+                  border:
+                      Border.all(color: AppColors.error.withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   children: [
@@ -215,10 +227,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               trailing: TextButton.icon(
                 onPressed: () => Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const SavedAddressesScreen()),
+                  MaterialPageRoute(
+                      builder: (_) => const SavedAddressesScreen()),
                 ),
                 icon: Icon(
-                  selectedAddress == null ? Icons.add_location_alt_outlined : Icons.edit_outlined,
+                  selectedAddress == null
+                      ? Icons.add_location_alt_outlined
+                      : Icons.edit_outlined,
                   size: 16.r,
                   color: AppColors.maroon,
                 ),
@@ -233,7 +248,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ),
             ),
             8.verticalSpace,
-            _buildAddressSection(context, selectedAddress, addressProvider.addresses),
+            _buildAddressSection(
+                context, selectedAddress, addressProvider.addresses),
             20.verticalSpace,
 
             // 2. Order Summary Preview Card
@@ -297,10 +313,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Widget _buildAddressSection(
-      BuildContext context,
-      AddressModel? selectedAddress,
-      List<AddressModel> allAddresses,
-      ) {
+    BuildContext context,
+    AddressModel? selectedAddress,
+    List<AddressModel> allAddresses,
+  ) {
     if (allAddresses.isEmpty) {
       return Container(
         padding: EdgeInsets.all(16.r),
@@ -391,7 +407,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     ),
                     8.horizontalSpace,
                     Container(
-                      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
                       decoration: BoxDecoration(
                         color: AppColors.maroon,
                         borderRadius: BorderRadius.circular(6.r),
@@ -583,7 +600,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Widget _buildBillSummaryCard(CartProvider cart) {
-    final double deliveryFee = _previewData?['delivery_fee']?.toDouble() ?? cart.deliveryFee;
+    final double deliveryFee =
+        _previewData?['delivery_fee']?.toDouble() ?? cart.deliveryFee;
 
     return Container(
       padding: EdgeInsets.all(16.r),
@@ -668,7 +686,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final bool isAvailable = _previewData?['is_available'] ?? true;
 
     // If preview call failed, do not block the customer — place_order handles server-side enforcement
-    final bool canPlace = cart.previewFailed || (meetsMinOrder && isDeliverable && isAvailable);
+    final bool canPlace =
+        cart.previewFailed || (meetsMinOrder && isDeliverable && isAvailable);
 
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 16.h),
@@ -727,9 +746,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               child: SizedBox(
                 height: 52.h,
                 child: ElevatedButton(
-                  onPressed: (_placing || !canPlace || !isAccepting) ? null : () => _placeOrder(context, cart),
+                  onPressed: (_placing || !canPlace || !isAccepting)
+                      ? null
+                      : () => _placeOrder(context, cart),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: isAccepting ? AppColors.maroon : Colors.grey.shade400,
+                    backgroundColor:
+                        isAccepting ? AppColors.maroon : Colors.grey.shade400,
                     foregroundColor: AppColors.gold,
                     elevation: 2,
                     shape: RoundedRectangleBorder(
@@ -738,40 +760,43 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   ),
                   child: _placing
                       ? SizedBox(
-                    height: 22.h,
-                    width: 22.w,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.5.w,
-                      color: AppColors.gold,
-                    ),
-                  )
+                          height: 22.h,
+                          width: 22.w,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5.w,
+                            color: AppColors.gold,
+                          ),
+                        )
                       : Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        !isAccepting
-                            ? (restaurant.statusType == RestaurantStatusType.paused
-                            ? 'TEMPORARILY UNAVAILABLE'
-                            : 'RESTAURANT CLOSED')
-                            : (_payment == PaymentChoice.upi ? 'Pay via UPI' : 'Place Order'),
-                        style: TextStyle(
-                          fontSize: 13.sp,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.gold,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              !isAccepting
+                                  ? (restaurant.statusType ==
+                                          RestaurantStatusType.paused
+                                      ? 'TEMPORARILY UNAVAILABLE'
+                                      : 'RESTAURANT CLOSED')
+                                  : (_payment == PaymentChoice.upi
+                                      ? 'Pay via UPI'
+                                      : 'Place Order'),
+                              style: TextStyle(
+                                fontSize: 13.sp,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.gold,
+                              ),
+                            ),
+                            if (isAccepting) ...[
+                              6.horizontalSpace,
+                              Icon(
+                                _payment == PaymentChoice.upi
+                                    ? Icons.arrow_forward_rounded
+                                    : Icons.check_circle_outline,
+                                size: 18.r,
+                                color: AppColors.gold,
+                              ),
+                            ],
+                          ],
                         ),
-                      ),
-                      if (isAccepting) ...[
-                        6.horizontalSpace,
-                        Icon(
-                          _payment == PaymentChoice.upi
-                              ? Icons.arrow_forward_rounded
-                              : Icons.check_circle_outline,
-                          size: 18.r,
-                          color: AppColors.gold,
-                        ),
-                      ],
-                    ],
-                  ),
                 ),
               ),
             ),
@@ -806,7 +831,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please sign in before placing an order.')),
+        const SnackBar(
+            content: Text('Please sign in before placing an order.')),
       );
       return;
     }
@@ -870,7 +896,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         failed: false,
       );
 
-      final calculatedServerTotal = (cart.subtotal - cart.couponDiscount) + preview.deliveryFee;
+      final calculatedServerTotal =
+          (cart.subtotal - cart.couponDiscount) + preview.deliveryFee;
       final currentShownTotal = cart.totalPayable;
 
       // Price update confirmation BEFORE order creation
@@ -882,8 +909,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             title: const Text('Order Total Updated'),
             content: Text(
               'The final order total from the server is ₹${calculatedServerTotal.toStringAsFixed(0)} '
-                  '(Delivery Fee: ₹${preview.deliveryFee.toStringAsFixed(0)}).\n\n'
-                  'Do you want to proceed?',
+              '(Delivery Fee: ₹${preview.deliveryFee.toStringAsFixed(0)}).\n\n'
+              'Do you want to proceed?',
             ),
             actions: [
               TextButton(
@@ -935,14 +962,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         setState(() => _placing = false);
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => OrderSuccessScreen(orderId: orderId)),
+          MaterialPageRoute(
+              builder: (_) => OrderSuccessScreen(orderId: orderId)),
         );
         return;
       }
 
       // 2b. Online / UPI payment via Razorpay
-      final session =
-      await functions.httpsCallable('razorpay_create_order').call({'order_id': orderId});
+      final session = await functions
+          .httpsCallable('razorpay_create_order')
+          .call({'order_id': orderId});
 
       final keyId = session.data['key_id'] as String;
       final amount = session.data['amount'] as int;
@@ -1001,10 +1030,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         ),
       );
     } on FirebaseFunctionsException catch (e) {
-      debugPrint('FirebaseFunctionsException: code=${e.code}, message=${e.message}, details=${e.details}');
+      debugPrint(
+          'FirebaseFunctionsException: code=${e.code}, message=${e.message}, details=${e.details}');
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message ?? 'Server error during order placement.')),
+        SnackBar(
+            content: Text(e.message ?? 'Server error during order placement.')),
       );
       setState(() => _placing = false);
     } catch (e) {
