@@ -65,22 +65,64 @@ class CouponsScreen extends StatelessWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Container(
-                          padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
-                          decoration: BoxDecoration(
-                            color: AppColors.maroon.withValues(alpha: 0.05),
-                            borderRadius: BorderRadius.circular(8.r),
-                            border: Border.all(color: AppColors.maroon.withValues(alpha: 0.1), style: BorderStyle.solid),
-                          ),
-                          child: Text(
-                            coupon.code,
-                            style: TextStyle(
-                              color: AppColors.maroon,
-                              fontWeight: FontWeight.w900,
-                              fontSize: 14.sp,
-                              letterSpacing: 1,
+                        Row(
+                          children: [
+                            Container(
+                              padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+                              decoration: BoxDecoration(
+                                color: AppColors.maroon.withValues(alpha: 0.05),
+                                borderRadius: BorderRadius.circular(8.r),
+                                border: Border.all(color: AppColors.maroon.withValues(alpha: 0.1)),
+                              ),
+                              child: Text(
+                                coupon.code,
+                                style: TextStyle(
+                                  color: AppColors.maroon,
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 14.sp,
+                                  letterSpacing: 1,
+                                ),
+                              ),
                             ),
-                          ),
+                            if (coupon.isFirstOrderOnly) ...[
+                              8.horizontalSpace,
+                              Container(
+                                padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                                decoration: BoxDecoration(
+                                  color: AppColors.gold.withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(6.r),
+                                ),
+                                child: Text(
+                                  'FIRST ORDER',
+                                  style: TextStyle(
+                                    color: AppColors.maroon,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 9.sp,
+                                  ),
+                                ),
+                              ),
+                            ],
+                            if (coupon.maxUsesPerUser != null) ...[
+                              6.horizontalSpace,
+                              Container(
+                                padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                                decoration: BoxDecoration(
+                                  color: AppColors.maroon.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(6.r),
+                                ),
+                                child: Text(
+                                  coupon.maxUsesPerUser == 1
+                                      ? '1 USE PER USER'
+                                      : 'MAX ${coupon.maxUsesPerUser} USES',
+                                  style: TextStyle(
+                                    color: AppColors.maroon,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 9.sp,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                         TextButton(
                           onPressed: canApply

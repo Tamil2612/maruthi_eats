@@ -53,6 +53,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Map<String, dynamic>? _previewData;
   String? _lastPreviewAddressId;
   double? _lastPreviewSubtotal;
+  CheckoutPreviewResult? _lastPreview;
+  DateTime? _lastPreviewAt;
   Timer? _debounceTimer;
 
   void _schedulePreviewFetch(AddressModel address, double subtotal) {
@@ -63,18 +65,46 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     });
   }
 
+  /// The preview this screen already loaded for the same address and cart, if it
+  /// is still fresh. Tapping Pay then skips a whole server round trip (which on a
+  /// cold server alone could take several seconds).
+  CheckoutPreviewResult? _freshPreview(AddressModel address, double subtotal) {
+    final at = _lastPreviewAt;
+    final preview = _lastPreview;
+    if (preview == null || at == null) return null;
+    if (_lastPreviewAddressId != address.id || _lastPreviewSubtotal != subtotal) return null;
+    if (DateTime.now().difference(at) > const Duration(minutes: 2)) return null;
+    return preview;
+  }
+
   Future<void> _fetchPreview(AddressModel address, double subtotal) async {
     _lastPreviewAddressId = address.id;
     _lastPreviewSubtotal = subtotal;
+    _lastPreview = null;
 
     try {
+      final cart = context.read<CartProvider>();
       final preview = await CheckoutService.getCheckoutPreview(
         latitude: address.latitude,
         longitude: address.longitude,
         subtotal: subtotal,
+        couponCode: cart.appliedCoupon?.code,
       );
+      _lastPreview = preview;
+      _lastPreviewAt = DateTime.now();
 
       if (mounted) {
+        if (!preview.couponValid && preview.couponError != null && cart.appliedCoupon != null) {
+          final errorMsg = preview.couponError!;
+          cart.removeCoupon();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(errorMsg),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+
         setState(() {
           _previewData = {
             'is_available': preview.isAvailable,
@@ -785,11 +815,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     try {
       // 1. Get server preview & validate BEFORE creating the order
-      final preview = await CheckoutService.getCheckoutPreview(
-        latitude: selectedAddress.latitude,
-        longitude: selectedAddress.longitude,
-        subtotal: cart.subtotal,
-      );
+      final preview = _freshPreview(selectedAddress, cart.subtotal) ??
+          await CheckoutService.getCheckoutPreview(
+            latitude: selectedAddress.latitude,
+            longitude: selectedAddress.longitude,
+            subtotal: cart.subtotal,
+          );
 
       if (!preview.isAvailable) {
         if (!context.mounted) return;

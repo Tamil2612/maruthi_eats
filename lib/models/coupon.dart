@@ -8,6 +8,10 @@ class Coupon {
   final DateTime? expiryDate;
   final String rules;
   final bool isActive;
+  final bool isFirstOrderOnly;
+  final int? maxUsesPerUser;
+  final int? maxGlobalUses;
+  final int currentGlobalUses;
 
   Coupon({
     required this.id,
@@ -17,6 +21,10 @@ class Coupon {
     this.expiryDate,
     required this.rules,
     this.isActive = true,
+    this.isFirstOrderOnly = false,
+    this.maxUsesPerUser,
+    this.maxGlobalUses,
+    this.currentGlobalUses = 0,
   });
 
   factory Coupon.fromFirestore(String id, Map<String, dynamic> data) {
@@ -30,6 +38,14 @@ class Coupon {
           : null,
       rules: data['rules'] ?? '',
       isActive: data['is_active'] ?? true,
+      isFirstOrderOnly: data['is_first_order_only'] ?? false,
+      maxUsesPerUser: data['max_uses_per_user'] != null
+          ? (data['max_uses_per_user'] as num).toInt()
+          : null,
+      maxGlobalUses: data['max_global_uses'] != null
+          ? (data['max_global_uses'] as num).toInt()
+          : null,
+      currentGlobalUses: (data['current_global_uses'] ?? 0).toInt(),
     );
   }
 
@@ -41,6 +57,10 @@ class Coupon {
       'expiry_date': expiryDate != null ? Timestamp.fromDate(expiryDate!) : null,
       'rules': rules,
       'is_active': isActive,
+      'is_first_order_only': isFirstOrderOnly,
+      if (maxUsesPerUser != null) 'max_uses_per_user': maxUsesPerUser,
+      if (maxGlobalUses != null) 'max_global_uses': maxGlobalUses,
+      'current_global_uses': currentGlobalUses,
     };
   }
 }

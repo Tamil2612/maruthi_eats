@@ -20,8 +20,15 @@ Future<RazorpayPaymentResult> openRazorpayCheckoutImplementation(
 
   void onError(PaymentFailureResponse response) {
     if (!completer.isCompleted) {
-      if (response.code == Razorpay.PAYMENT_CANCELLED || response.code == 2) {
+      if (response.code == Razorpay.PAYMENT_CANCELLED) {
         completer.complete(RazorpayPaymentResult.dismissed());
+      } else if (response.code == Razorpay.NETWORK_ERROR) {
+        // A dropped connection is NOT a cancellation: the customer may already have
+        // paid. The server confirms such payments by itself within a couple of
+        // minutes, so say that instead of "Payment cancelled".
+        completer.complete(RazorpayPaymentResult.failure(
+            'Network problem during payment. If money was deducted, your order '
+                'will be confirmed automatically in a few minutes.'));
       } else {
         final msg = response.message != null && response.message!.isNotEmpty
             ? response.message!

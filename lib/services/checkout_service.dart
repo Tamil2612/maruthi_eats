@@ -11,6 +11,9 @@ class CheckoutPreviewResult {
   final double minimumOrderValue;
   final bool meetsMinimumOrder;
   final String minimumOrderMessage;
+  final bool couponValid;
+  final String? couponError;
+  final double couponDiscount;
 
   CheckoutPreviewResult({
     required this.isAvailable,
@@ -23,6 +26,9 @@ class CheckoutPreviewResult {
     required this.minimumOrderValue,
     required this.meetsMinimumOrder,
     required this.minimumOrderMessage,
+    this.couponValid = true,
+    this.couponError,
+    this.couponDiscount = 0.0,
   });
 
   factory CheckoutPreviewResult.fromMap(Map<String, dynamic> map) {
@@ -37,6 +43,9 @@ class CheckoutPreviewResult {
       minimumOrderValue: (map['minimum_order_value'] ?? 150.0).toDouble(),
       meetsMinimumOrder: map['meets_minimum_order'] ?? true,
       minimumOrderMessage: map['minimum_order_message'] ?? '',
+      couponValid: map['coupon_valid'] ?? true,
+      couponError: map['coupon_error'],
+      couponDiscount: (map['coupon_discount'] ?? 0.0).toDouble(),
     );
   }
 }
@@ -46,6 +55,7 @@ class CheckoutService {
     required double latitude,
     required double longitude,
     required double subtotal,
+    String? couponCode,
   }) async {
     final res = await FirebaseFunctions.instanceFor(region: 'asia-south1')
         .httpsCallable('get_checkout_preview')
@@ -53,6 +63,7 @@ class CheckoutService {
       'latitude': latitude,
       'longitude': longitude,
       'subtotal': subtotal,
+      if (couponCode != null && couponCode.isNotEmpty) 'coupon_code': couponCode,
     });
 
     final data = Map<String, dynamic>.from(res.data as Map);
