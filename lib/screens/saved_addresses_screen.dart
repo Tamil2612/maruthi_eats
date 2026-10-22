@@ -37,14 +37,20 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.error_outline, size: 48.r, color: AppColors.error),
+                    Icon(Icons.error_outline,
+                        size: 48.r, color: AppColors.error),
                     16.verticalSpace,
                     Text('Permission Denied',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18.sp, color: AppColors.error)),
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18.sp,
+                            color: AppColors.error)),
                     8.verticalSpace,
-                    Text('Please update your Firestore rules in the Firebase Console.',
+                    Text(
+                        'Please update your Firestore rules in the Firebase Console.',
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: AppColors.textDark.withValues(alpha: 0.6))),
+                        style: TextStyle(
+                            color: AppColors.textDark.withValues(alpha: 0.6))),
                   ],
                 ),
               ),
@@ -52,7 +58,8 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
           }
 
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator(color: AppColors.maroon));
+            return const Center(
+                child: CircularProgressIndicator(color: AppColors.maroon));
           }
 
           final addresses = snapshot.data ?? [];
@@ -62,197 +69,233 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.location_off_outlined, size: 64.r, color: AppColors.maroon.withValues(alpha: 0.3)),
+                  Icon(Icons.location_off_outlined,
+                      size: 64.r,
+                      color: AppColors.maroon.withValues(alpha: 0.3)),
                   16.verticalSpace,
-                  Text('No addresses saved yet', style: TextStyle(color: AppColors.textDark.withValues(alpha: 0.5))),
+                  Text('No addresses saved yet',
+                      style: TextStyle(
+                          color: AppColors.textDark.withValues(alpha: 0.5))),
                 ],
               ),
             );
           }
 
-          return ListView.builder(
-            padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 100.h),
-            itemCount: addresses.length,
-            itemBuilder: (context, i) {
-              final addr = addresses[i];
-              final isSelected = selectedAddress?.id == addr.id;
+          return RadioGroup<String>(
+            groupValue: selectedAddress?.id,
+            onChanged: (value) {
+              if (value == null) return;
+              final address =
+                  addresses.firstWhere((address) => address.id == value);
+              context.read<AddressProvider>().selectAddress(address);
+              Navigator.pop(context);
+            },
+            child: ListView.builder(
+              padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 100.h),
+              itemCount: addresses.length,
+              itemBuilder: (context, i) {
+                final addr = addresses[i];
+                final isSelected = selectedAddress?.id == addr.id;
 
-              return InkWell(
-                onTap: () {
-                  context.read<AddressProvider>().selectAddress(addr);
-                  Navigator.pop(context);
-                },
-                borderRadius: BorderRadius.circular(20.r),
-                child: Container(
-                  margin: EdgeInsets.only(bottom: 16.h),
-                  decoration: BoxDecoration(
-                    color: AppColors.white,
-                    borderRadius: BorderRadius.circular(20.r),
-                    border: Border.all(
-                      color: isSelected ? AppColors.maroon : AppColors.maroon.withValues(alpha: 0.08),
-                      width: isSelected ? 2.w : 1.w,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.black.withValues(alpha: 0.04),
-                        blurRadius: 10.r,
-                        offset: Offset(0, 4.h),
+                return InkWell(
+                  onTap: () {
+                    context.read<AddressProvider>().selectAddress(addr);
+                    Navigator.pop(context);
+                  },
+                  borderRadius: BorderRadius.circular(20.r),
+                  child: Container(
+                    margin: EdgeInsets.only(bottom: 16.h),
+                    decoration: BoxDecoration(
+                      color: AppColors.white,
+                      borderRadius: BorderRadius.circular(20.r),
+                      border: Border.all(
+                        color: isSelected
+                            ? AppColors.maroon
+                            : AppColors.maroon.withValues(alpha: 0.08),
+                        width: isSelected ? 2.w : 1.w,
                       ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: EdgeInsets.all(16.r),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Category Icon with soft background
-                            Container(
-                              padding: EdgeInsets.all(12.r),
-                              decoration: BoxDecoration(
-                                color: AppColors.maroon.withValues(alpha: 0.06),
-                                borderRadius: BorderRadius.circular(14.r),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.black.withValues(alpha: 0.04),
+                          blurRadius: 10.r,
+                          offset: Offset(0, 4.h),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: EdgeInsets.all(16.r),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Category Icon with soft background
+                              Container(
+                                padding: EdgeInsets.all(12.r),
+                                decoration: BoxDecoration(
+                                  color:
+                                      AppColors.maroon.withValues(alpha: 0.06),
+                                  borderRadius: BorderRadius.circular(14.r),
+                                ),
+                                child: Icon(
+                                  addr.label.toLowerCase() == 'home'
+                                      ? Icons.home_rounded
+                                      : addr.label.toLowerCase() == 'work'
+                                          ? Icons.business_rounded
+                                          : Icons.place_rounded,
+                                  size: 26.r,
+                                  color: AppColors.maroon,
+                                ),
                               ),
-                              child: Icon(
-                                addr.label.toLowerCase() == 'home'
-                                    ? Icons.home_rounded
-                                    : addr.label.toLowerCase() == 'work'
-                                        ? Icons.business_rounded
-                                        : Icons.place_rounded,
-                                size: 26.r,
-                                color: AppColors.maroon,
-                              ),
-                            ),
-                            16.horizontalSpace,
-                            // Address Details
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Text(
-                                        addr.label.toUpperCase(),
-                                        style: TextStyle(
-                                          color: AppColors.maroon,
-                                          fontWeight: FontWeight.w900,
-                                          fontSize: 11.sp,
-                                          letterSpacing: 1.w,
-                                        ),
-                                      ),
-                                      if (isSelected) ...[
-                                        8.horizontalSpace,
-                                        Container(
-                                          padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
-                                          decoration: BoxDecoration(
+                              16.horizontalSpace,
+                              // Address Details
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Text(
+                                          addr.label.toUpperCase(),
+                                          style: TextStyle(
                                             color: AppColors.maroon,
-                                            borderRadius: BorderRadius.circular(6.r),
+                                            fontWeight: FontWeight.w900,
+                                            fontSize: 11.sp,
+                                            letterSpacing: 1.w,
                                           ),
-                                          child: Text(
-                                            'SELECTED',
-                                            style: TextStyle(
-                                              color: AppColors.gold,
-                                              fontSize: 9.sp,
-                                              fontWeight: FontWeight.bold,
+                                        ),
+                                        if (isSelected) ...[
+                                          8.horizontalSpace,
+                                          Container(
+                                            padding: EdgeInsets.symmetric(
+                                                horizontal: 8.w, vertical: 2.h),
+                                            decoration: BoxDecoration(
+                                              color: AppColors.maroon,
+                                              borderRadius:
+                                                  BorderRadius.circular(6.r),
+                                            ),
+                                            child: Text(
+                                              'SELECTED',
+                                              style: TextStyle(
+                                                color: AppColors.gold,
+                                                fontSize: 9.sp,
+                                                fontWeight: FontWeight.bold,
+                                              ),
                                             ),
                                           ),
+                                        ],
+                                      ],
+                                    ),
+                                    6.verticalSpace,
+                                    Text(
+                                      addr.fullAddress,
+                                      style: TextStyle(
+                                        fontSize: 12.sp,
+                                        color: AppColors.textDark
+                                            .withValues(alpha: 0.7),
+                                        height: 1.5,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    8.verticalSpace,
+                                    Wrap(
+                                      spacing: 12.w,
+                                      runSpacing: 4.h,
+                                      children: [
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.person_outline,
+                                                size: 13.r,
+                                                color: AppColors.textDark
+                                                    .withValues(alpha: 0.5)),
+                                            4.horizontalSpace,
+                                            Text(
+                                              addr.recipientName,
+                                              style: TextStyle(
+                                                  fontSize: 11.sp,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: AppColors.textDark
+                                                      .withValues(alpha: 0.6)),
+                                            ),
+                                          ],
+                                        ),
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.phone_outlined,
+                                                size: 13.r,
+                                                color: AppColors.textDark
+                                                    .withValues(alpha: 0.5)),
+                                            4.horizontalSpace,
+                                            Text(
+                                              addr.recipientPhone,
+                                              style: TextStyle(
+                                                  fontSize: 11.sp,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: AppColors.textDark
+                                                      .withValues(alpha: 0.6)),
+                                            ),
+                                          ],
                                         ),
                                       ],
-                                    ],
-                                  ),
-                                  6.verticalSpace,
-                                  Text(
-                                    addr.fullAddress,
-                                    style: TextStyle(
-                                      fontSize: 12.sp,
-                                      color: AppColors.textDark.withValues(alpha: 0.7),
-                                      height: 1.5,
-                                      fontWeight: FontWeight.w500,
                                     ),
-                                  ),
-                                  8.verticalSpace,
-                                  Wrap(
-                                    spacing: 12.w,
-                                    runSpacing: 4.h,
-                                    children: [
-                                      Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(Icons.person_outline, size: 13.r, color: AppColors.textDark.withValues(alpha: 0.5)),
-                                          4.horizontalSpace,
-                                          Text(
-                                            addr.recipientName,
-                                            style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w600, color: AppColors.textDark.withValues(alpha: 0.6)),
-                                          ),
-                                        ],
-                                      ),
-                                      Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(Icons.phone_outlined, size: 13.r, color: AppColors.textDark.withValues(alpha: 0.5)),
-                                          4.horizontalSpace,
-                                          Text(
-                                            addr.recipientPhone,
-                                            style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w600, color: AppColors.textDark.withValues(alpha: 0.6)),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
-                            ),
-                            Radio<String>(
-                              value: addr.id,
-                              groupValue: selectedAddress?.id,
-                              activeColor: AppColors.maroon,
-                              onChanged: (val) {
-                                context.read<AddressProvider>().selectAddress(addr);
-                                Navigator.pop(context);
-                              },
-                            ),
-                          ],
+                              Radio<String>(
+                                value: addr.id,
+                                activeColor: AppColors.maroon,
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                      const Divider(height: 1),
-                      // Action Buttons Row
-                      Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 4.h),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            TextButton.icon(
-                              onPressed: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(builder: (_) => AddEditAddressScreen(address: addr)),
+                        const Divider(height: 1),
+                        // Action Buttons Row
+                        Padding(
+                          padding: EdgeInsets.symmetric(
+                              horizontal: 12.w, vertical: 4.h),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              TextButton.icon(
+                                onPressed: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                      builder: (_) =>
+                                          AddEditAddressScreen(address: addr)),
+                                ),
+                                icon: Icon(Icons.edit_outlined, size: 18.r),
+                                label: const Text('EDIT'),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: AppColors.maroon,
+                                  textStyle: TextStyle(
+                                      fontSize: 11.sp,
+                                      fontWeight: FontWeight.bold),
+                                ),
                               ),
-                              icon: Icon(Icons.edit_outlined, size: 18.r),
-                              label: const Text('EDIT'),
-                              style: TextButton.styleFrom(
-                                foregroundColor: AppColors.maroon,
-                                textStyle: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.bold),
+                              16.horizontalSpace,
+                              TextButton.icon(
+                                onPressed: () => _confirmDelete(addr),
+                                icon: Icon(Icons.delete_outline, size: 18.r),
+                                label: const Text('DELETE'),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: AppColors.error,
+                                  textStyle: TextStyle(
+                                      fontSize: 11.sp,
+                                      fontWeight: FontWeight.bold),
+                                ),
                               ),
-                            ),
-                            16.horizontalSpace,
-                            TextButton.icon(
-                              onPressed: () => _confirmDelete(addr),
-                              icon: Icon(Icons.delete_outline, size: 18.r),
-                              label: const Text('DELETE'),
-                              style: TextButton.styleFrom(
-                                foregroundColor: AppColors.error,
-                                textStyle: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              );
-            },
+                );
+              },
+            ),
           );
         },
       ),
@@ -262,7 +305,10 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
           color: AppColors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(32.r)),
           boxShadow: [
-            BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 20.r, offset: Offset(0, -10.h)),
+            BoxShadow(
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 20.r,
+                offset: Offset(0, -10.h)),
           ],
         ),
         child: SafeArea(
@@ -295,13 +341,16 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
         title: const Text('Delete Address?'),
         content: const Text('Are you sure you want to remove this address?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           TextButton(
             onPressed: () {
-              _authService.deleteAddress(_authService.currentUser!.uid, address.id);
+              _authService.deleteAddress(
+                  _authService.currentUser!.uid, address.id);
               Navigator.pop(ctx);
             },
-            child: const Text('Delete', style: TextStyle(color: AppColors.error)),
+            child:
+                const Text('Delete', style: TextStyle(color: AppColors.error)),
           ),
         ],
       ),

@@ -79,10 +79,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final at = _lastPreviewAt;
     final preview = _lastPreview;
     if (preview == null || at == null) return null;
-    if (_lastPreviewAddressId != address.id || _lastPreviewSubtotal != subtotal) {
+    if (_lastPreviewAddressId != address.id ||
+        _lastPreviewSubtotal != subtotal) {
       return null;
     }
-    if (_lastPreviewCoupon != context.read<CartProvider>().appliedCoupon?.code) {
+    if (_lastPreviewCoupon !=
+        context.read<CartProvider>().appliedCoupon?.code) {
       return null;
     }
     if (DateTime.now().difference(at) > const Duration(minutes: 2)) return null;
@@ -543,60 +545,58 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           )
         ],
       ),
-      child: Column(
-        children: [
-          RadioListTile<PaymentChoice>(
-            value: PaymentChoice.upi,
-            groupValue: _payment,
-            activeColor: AppColors.maroon,
-            onChanged: (val) {
-              if (val != null) setState(() => _payment = val);
-            },
-            title: Text(
-              'Online Payment (Razorpay / UPI / Cards)',
-              style: TextStyle(
-                fontSize: 13.sp,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textDark,
+      child: RadioGroup<PaymentChoice>(
+        groupValue: _payment,
+        onChanged: (value) {
+          if (value != null) setState(() => _payment = value);
+        },
+        child: Column(
+          children: [
+            RadioListTile<PaymentChoice>(
+              value: PaymentChoice.upi,
+              activeColor: AppColors.maroon,
+              title: Text(
+                'Online Payment (Razorpay / UPI / Cards)',
+                style: TextStyle(
+                  fontSize: 13.sp,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textDark,
+                ),
+              ),
+              subtitle: Text(
+                'Fast & secure payment via GPay, PhonePe, Cards, NetBanking',
+                style: TextStyle(fontSize: 11.sp, color: AppColors.grey),
+              ),
+              secondary: Icon(
+                Icons.account_balance_wallet_outlined,
+                color: AppColors.maroon,
+                size: 22.r,
               ),
             ),
-            subtitle: Text(
-              'Fast & secure payment via GPay, PhonePe, Cards, NetBanking',
-              style: TextStyle(fontSize: 11.sp, color: AppColors.grey),
-            ),
-            secondary: Icon(
-              Icons.account_balance_wallet_outlined,
-              color: AppColors.maroon,
-              size: 22.r,
-            ),
-          ),
-          Divider(color: AppColors.grey.withValues(alpha: 0.15), height: 1),
-          RadioListTile<PaymentChoice>(
-            value: PaymentChoice.cod,
-            groupValue: _payment,
-            activeColor: AppColors.maroon,
-            onChanged: (val) {
-              if (val != null) setState(() => _payment = val);
-            },
-            title: Text(
-              'Cash on Delivery',
-              style: TextStyle(
-                fontSize: 13.sp,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textDark,
+            Divider(color: AppColors.grey.withValues(alpha: 0.15), height: 1),
+            RadioListTile<PaymentChoice>(
+              value: PaymentChoice.cod,
+              activeColor: AppColors.maroon,
+              title: Text(
+                'Cash on Delivery',
+                style: TextStyle(
+                  fontSize: 13.sp,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textDark,
+                ),
+              ),
+              subtitle: Text(
+                'Pay with cash or UPI upon delivery',
+                style: TextStyle(fontSize: 11.sp, color: AppColors.grey),
+              ),
+              secondary: Icon(
+                Icons.payments_outlined,
+                color: AppColors.maroon,
+                size: 22.r,
               ),
             ),
-            subtitle: Text(
-              'Pay with cash or UPI upon delivery',
-              style: TextStyle(fontSize: 11.sp, color: AppColors.grey),
-            ),
-            secondary: Icon(
-              Icons.payments_outlined,
-              color: AppColors.maroon,
-              size: 22.r,
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
