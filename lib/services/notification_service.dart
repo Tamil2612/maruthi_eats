@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -13,9 +14,14 @@ class NotificationService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   StreamSubscription<String>? _tokenSubscription;
 
-  /// Prompts notification permission (Android 13+ / iOS) right after login
-  /// or registration, and saves the device's FCM token to /users/{uid}.
-  Future<void> requestPermissionAndSaveToken(String uid) async {
+  static const _webVapidKey = String.fromEnvironment('FCM_VAPID_KEY');
+
+  /// Prompts for permission and saves the device's FCM token to /users/{uid}.
+  ///
+  /// On iOS/iPadOS PWAs this must be called directly from a user action. The
+  /// app therefore exposes this through the Account screen instead of asking
+  /// during startup, which Safari rejects.
+  Future<AuthorizationStatus?> requestPermissionAndSaveToken(String uid) async {
     try {
       NotificationSettings settings = await _fcm.requestPermission(
         alert: true,
@@ -26,26 +32,58 @@ class NotificationService {
 
       if (settings.authorizationStatus == AuthorizationStatus.authorized ||
           settings.authorizationStatus == AuthorizationStatus.provisional) {
-        final token = await _fcm.getToken();
-        if (token != null) {
-          await _db.collection('users').doc(uid).set(
-            {'fcm_token': token},
-            SetOptions(merge: true),
-          );
-        }
-
-        // Listen for token rotations and keep user document updated
-        _tokenSubscription?.cancel();
-        _tokenSubscription = _fcm.onTokenRefresh.listen((newToken) {
-          _db.collection('users').doc(uid).set(
-            {'fcm_token': newToken},
-            SetOptions(merge: true),
-          );
-        });
+        await _saveToken(uid);
+        _listenForTokenRefresh(uid);
       }
+      return settings.authorizationStatus;
     } catch (e) {
       debugPrint('Error setting up push notifications: $e');
+      return null;
     }
+  }
+
+  /// Saves a token only when permission was already granted. This is safe to
+  /// call at startup because it never opens Safari's permission prompt.
+  Future<void> saveTokenIfAuthorized(String uid) async {
+    try {
+      final settings = await _fcm.getNotificationSettings();
+      if (settings.authorizationStatus == AuthorizationStatus.authorized ||
+          settings.authorizationStatus == AuthorizationStatus.provisional) {
+        await _saveToken(uid);
+        _listenForTokenRefresh(uid);
+      }
+    } catch (e) {
+      debugPrint('Error syncing push notification token: $e');
+    }
+  }
+
+  Future<void> _saveToken(String uid) async {
+    final token = kIsWeb
+        ? await _fcm.getToken(
+            // The Firebase web plugin registers this exact worker before
+            // obtaining the token. The key is supplied at build time:
+            // flutter build web --dart-define=FCM_VAPID_KEY=...
+            vapidKey: _webVapidKey.isEmpty ? null : _webVapidKey,
+            serviceWorkerScriptPath: 'firebase-messaging-sw.js',
+          )
+        : await _fcm.getToken();
+
+    if (token != null && token.isNotEmpty) {
+      await _db.collection('users').doc(uid).set(
+        {'fcm_token': token},
+        SetOptions(merge: true),
+      );
+    }
+  }
+
+  void _listenForTokenRefresh(String uid) {
+    _tokenSubscription?.cancel();
+    _tokenSubscription = _fcm.onTokenRefresh.listen((newToken) {
+      _db.collection('users').doc(uid).set(
+        {'fcm_token': newToken},
+        SetOptions(merge: true),
+      );
+    });
   }
 
   /// Sets up foreground, background, and terminated app notification tap handlers.
@@ -78,7 +116,8 @@ class NotificationService {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => OrderTrackingScreen(orderId: orderId),
+                            builder: (_) =>
+                                OrderTrackingScreen(orderId: orderId),
                           ),
                         );
                       }

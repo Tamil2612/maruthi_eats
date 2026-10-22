@@ -34,9 +34,9 @@ void main() async {
     appleProvider: AppleProvider.deviceCheck,
   );
 
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-  await FirebaseMessaging.instance.requestPermission();
-
+  if (!kIsWeb) {
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  }
   runApp(const MaruthiEatsApp());
 }
 

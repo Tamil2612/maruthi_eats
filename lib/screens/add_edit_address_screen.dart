@@ -212,7 +212,7 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
       _suggestions = [];
       _hasNoResults = false;
       _searchController.text =
-          suggestion.title.isNotEmpty ? suggestion.title : suggestion.subtitle;
+      suggestion.title.isNotEmpty ? suggestion.title : suggestion.subtitle;
     });
 
     if (suggestion.placeId != null && suggestion.placeId!.isNotEmpty) {
@@ -229,8 +229,8 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
             final displayText = placeDetails.displayName.isNotEmpty
                 ? placeDetails.displayName
                 : (suggestion.title.isNotEmpty
-                    ? suggestion.title
-                    : placeDetails.formattedAddress);
+                ? suggestion.title
+                : placeDetails.formattedAddress);
             _searchController.text = displayText;
             if (placeDetails.formattedAddress.isNotEmpty) {
               _streetController.text = placeDetails.formattedAddress;
@@ -354,8 +354,8 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
           title: Text(
             _currentStep == 0
                 ? (widget.address == null
-                    ? 'Set Delivery Location'
-                    : 'Edit Location')
+                ? 'Set Delivery Location'
+                : 'Edit Location')
                 : 'Enter Address Details',
             style: GoogleFonts.playfairDisplay(
               color: AppColors.white,
@@ -419,7 +419,7 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
               children: [
                 Container(
                   padding:
-                      EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+                  EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
                   decoration: BoxDecoration(
                     color: outsideArea ? AppColors.error : AppColors.textDark,
                     borderRadius: BorderRadius.circular(8.r),
@@ -589,14 +589,14 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
                         ),
                         subtitle: item.subtitle.isNotEmpty
                             ? Text(
-                                item.subtitle,
-                                style: TextStyle(
-                                  fontSize: 11.sp,
-                                  color: AppColors.grey,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              )
+                          item.subtitle,
+                          style: TextStyle(
+                            fontSize: 11.sp,
+                            color: AppColors.grey,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        )
                             : null,
                         onTap: () => _selectSuggestion(item),
                       );
@@ -633,18 +633,18 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
                       alignment: Alignment.center,
                       child: _isLoadingLocation
                           ? SizedBox(
-                              width: 20.r,
-                              height: 20.r,
-                              child: const CircularProgressIndicator(
-                                strokeWidth: 2.5,
-                                color: AppColors.maroon,
-                              ),
-                            )
+                        width: 20.r,
+                        height: 20.r,
+                        child: const CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          color: AppColors.maroon,
+                        ),
+                      )
                           : Icon(
-                              Icons.my_location_rounded,
-                              size: 22.r,
-                              color: AppColors.maroon,
-                            ),
+                        Icons.my_location_rounded,
+                        size: 22.r,
+                        color: AppColors.maroon,
+                      ),
                     ),
                   ),
                 ),
@@ -656,7 +656,7 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
                 decoration: BoxDecoration(
                   color: AppColors.white,
                   borderRadius:
-                      BorderRadius.vertical(top: Radius.circular(24.r)),
+                  BorderRadius.vertical(top: Radius.circular(24.r)),
                   boxShadow: [
                     BoxShadow(
                       color: AppColors.black.withValues(alpha: 0.12),
@@ -751,9 +751,9 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
                           onPressed: outsideArea
                               ? null
                               : () {
-                                  FocusScope.of(context).unfocus();
-                                  setState(() => _currentStep = 1);
-                                },
+                            FocusScope.of(context).unfocus();
+                            setState(() => _currentStep = 1);
+                          },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.maroon,
                             foregroundColor: AppColors.gold,
@@ -876,7 +876,7 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
                                     horizontal: 10.w, vertical: 4.h),
                                 decoration: BoxDecoration(
                                   color:
-                                      AppColors.maroon.withValues(alpha: 0.1),
+                                  AppColors.maroon.withValues(alpha: 0.1),
                                   borderRadius: BorderRadius.circular(8.r),
                                 ),
                                 child: Text(
@@ -1081,23 +1081,23 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
                   ),
                   child: _saving
                       ? SizedBox(
-                          width: 22.w,
-                          height: 22.h,
-                          child: const CircularProgressIndicator(
-                            strokeWidth: 2.5,
-                            color: AppColors.gold,
-                          ),
-                        )
+                    width: 22.w,
+                    height: 22.h,
+                    child: const CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      color: AppColors.gold,
+                    ),
+                  )
                       : Text(
-                          outsideArea
-                              ? 'LOCATION OUTSIDE DELIVERY AREA'
-                              : 'SAVE ADDRESS',
-                          style: TextStyle(
-                            fontSize: 13.sp,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
+                    outsideArea
+                        ? 'LOCATION OUTSIDE DELIVERY AREA'
+                        : 'SAVE ADDRESS',
+                    style: TextStyle(
+                      fontSize: 13.sp,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -1255,17 +1255,17 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
                 ),
                 suffixIcon: hasText
                     ? IconButton(
-                        icon: Icon(
-                          Icons.cancel_rounded,
-                          size: 18.r,
-                          color: AppColors.textDark.withValues(alpha: 0.3),
-                        ),
-                        onPressed: () {
-                          controller.clear();
-                          setState(() {});
-                        },
-                        splashRadius: 16.r,
-                      )
+                  icon: Icon(
+                    Icons.cancel_rounded,
+                    size: 18.r,
+                    color: AppColors.textDark.withValues(alpha: 0.3),
+                  ),
+                  onPressed: () {
+                    controller.clear();
+                    setState(() {});
+                  },
+                  splashRadius: 16.r,
+                )
                     : null,
                 contentPadding: EdgeInsets.symmetric(
                   horizontal: 14.w,
@@ -1320,12 +1320,12 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
             ),
             boxShadow: isSelected
                 ? [
-                    BoxShadow(
-                      color: AppColors.maroon.withValues(alpha: 0.2),
-                      blurRadius: 8.r,
-                      offset: const Offset(0, 2),
-                    )
-                  ]
+              BoxShadow(
+                color: AppColors.maroon.withValues(alpha: 0.2),
+                blurRadius: 8.r,
+                offset: const Offset(0, 2),
+              )
+            ]
                 : [],
           ),
           child: Column(
@@ -1369,6 +1369,30 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
       return;
     }
 
+    if (name.length < 2) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter the recipient\'s name')),
+      );
+      return;
+    }
+
+    // The restaurant and the rider call this number, so it must be a real Indian
+    // mobile number: 10 digits starting with 6-9 (a leading +91 / 91 / 0 is accepted).
+    var digits = phone.replaceAll(RegExp(r'[\s\-()]'), '');
+    if (digits.startsWith('+91')) {
+      digits = digits.substring(3);
+    } else if (digits.startsWith('91') && digits.length == 12) {
+      digits = digits.substring(2);
+    } else if (digits.startsWith('0') && digits.length == 11) {
+      digits = digits.substring(1);
+    }
+    if (!RegExp(r'^[6-9]\d{9}$').hasMatch(digits)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a valid 10-digit mobile number')),
+      );
+      return;
+    }
+
     final fullAddr = '$flatNo, $street';
     final finalLabel = _selectedType == 'Other' ? customLabel : _selectedType;
 
@@ -1389,7 +1413,7 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
         latitude: _selectedLocation.latitude,
         longitude: _selectedLocation.longitude,
         recipientName: name,
-        recipientPhone: phone,
+        recipientPhone: digits,
       );
       if (!mounted) return;
       Navigator.pop(context);

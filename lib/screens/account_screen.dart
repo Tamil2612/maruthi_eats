@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import '../models/app_user.dart';
 import '../services/auth_service.dart';
+import '../services/notification_service.dart';
 import '../theme/app_theme.dart';
 import 'edit_profile_screen.dart';
 import 'saved_addresses_screen.dart';
@@ -35,7 +37,8 @@ class AccountScreen extends StatelessWidget {
                   padding: EdgeInsets.symmetric(vertical: 32.h),
                   decoration: BoxDecoration(
                     color: AppColors.maroon,
-                    borderRadius: BorderRadius.vertical(bottom: Radius.circular(32.r)),
+                    borderRadius:
+                        BorderRadius.vertical(bottom: Radius.circular(32.r)),
                   ),
                   child: Column(
                     children: [
@@ -43,57 +46,90 @@ class AccountScreen extends StatelessWidget {
                         radius: 40.r,
                         backgroundColor: AppColors.gold,
                         child: Text(
-                          (appUser?.name.isNotEmpty == true) ? appUser!.name[0].toUpperCase() : 'U',
-                          style: TextStyle(fontSize: 28.sp, fontWeight: FontWeight.bold, color: AppColors.maroon),
+                          (appUser?.name.isNotEmpty == true)
+                              ? appUser!.name[0].toUpperCase()
+                              : 'U',
+                          style: TextStyle(
+                              fontSize: 28.sp,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.maroon),
                         ),
                       ),
                       16.verticalSpace,
                       Text(
                         appUser?.name ?? 'User',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18.sp, color: AppColors.white),
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18.sp,
+                            color: AppColors.white),
                       ),
                       4.verticalSpace,
                       Text(
                         appUser?.phone ?? '',
-                        style: TextStyle(color: AppColors.gold.withValues(alpha: 0.8), fontSize: 13.sp),
+                        style: TextStyle(
+                            color: AppColors.gold.withValues(alpha: 0.8),
+                            fontSize: 13.sp),
                       ),
                     ],
                   ),
                 ),
-                
+
                 24.verticalSpace,
-                
+
                 // Menu Items
                 _AccountMenuItem(
                   icon: Icons.person_outline,
                   label: 'Edit Profile',
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EditProfileScreen())),
+                  onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const EditProfileScreen())),
                 ),
                 _AccountMenuItem(
                   icon: Icons.location_on_outlined,
                   label: 'Saved Addresses',
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SavedAddressesScreen())),
+                  onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const SavedAddressesScreen())),
                 ),
-                
+
+                _AccountMenuItem(
+                  icon: Icons.notifications_outlined,
+                  label: 'Enable Order Notifications',
+                  onTap: () => _enableNotifications(context, user.uid),
+                ),
+
                 24.verticalSpace,
                 Padding(
                   padding: EdgeInsets.symmetric(horizontal: 24.w),
                   child: Align(
                     alignment: Alignment.centerLeft,
-                    child: Text('Legal', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.bold, color: AppColors.textDark.withValues(alpha: 0.4), letterSpacing: 1)),
+                    child: Text('Legal',
+                        style: TextStyle(
+                            fontSize: 12.sp,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textDark.withValues(alpha: 0.4),
+                            letterSpacing: 1)),
                   ),
                 ),
                 8.verticalSpace,
-                
+
                 _AccountMenuItem(
                   icon: Icons.privacy_tip_outlined,
                   label: 'Privacy Policy',
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen())),
+                  onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const PrivacyPolicyScreen())),
                 ),
                 _AccountMenuItem(
                   icon: Icons.description_outlined,
                   label: 'Terms & Conditions',
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TermsConditionsScreen())),
+                  onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const TermsConditionsScreen())),
                 ),
                 _AccountMenuItem(
                   icon: Icons.info_outline,
@@ -103,13 +139,14 @@ class AccountScreen extends StatelessWidget {
                       context: context,
                       applicationName: 'Maruthi Eats',
                       applicationVersion: '1.0.0',
-                      applicationIcon: Icon(Icons.restaurant_menu, color: AppColors.maroon, size: 40.r),
+                      applicationIcon: Icon(Icons.restaurant_menu,
+                          color: AppColors.maroon, size: 40.r),
                     );
                   },
                 ),
-                
+
                 32.verticalSpace,
-                
+
                 Padding(
                   padding: EdgeInsets.symmetric(horizontal: 24.w),
                   child: Column(
@@ -118,7 +155,8 @@ class AccountScreen extends StatelessWidget {
                         width: double.infinity,
                         height: 56.h,
                         child: OutlinedButton.icon(
-                          onPressed: () => _showSignOutDialog(context, authService),
+                          onPressed: () =>
+                              _showSignOutDialog(context, authService),
                           icon: const Icon(Icons.logout),
                           label: const Text('Sign Out'),
                         ),
@@ -127,21 +165,27 @@ class AccountScreen extends StatelessWidget {
                       SizedBox(
                         width: double.infinity,
                         child: TextButton(
-                          onPressed: () => _showDeleteAccountDialog(context, authService),
+                          onPressed: () =>
+                              _showDeleteAccountDialog(context, authService),
                           child: Text(
                             'Delete Account',
-                            style: TextStyle(color: AppColors.error, fontWeight: FontWeight.w600, fontSize: 13.sp),
+                            style: TextStyle(
+                                color: AppColors.error,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13.sp),
                           ),
                         ),
                       ),
                     ],
                   ),
                 ),
-                
+
                 24.verticalSpace,
                 Text(
                   'v1.0.0',
-                  style: TextStyle(color: AppColors.textDark.withValues(alpha: 0.3), fontSize: 12.sp),
+                  style: TextStyle(
+                      color: AppColors.textDark.withValues(alpha: 0.3),
+                      fontSize: 12.sp),
                 ),
               ],
             ),
@@ -151,6 +195,24 @@ class AccountScreen extends StatelessWidget {
     );
   }
 
+  Future<void> _enableNotifications(BuildContext context, String uid) async {
+    final status =
+        await NotificationService().requestPermissionAndSaveToken(uid);
+    if (!context.mounted) return;
+
+    final message = switch (status) {
+      AuthorizationStatus.authorized ||
+      AuthorizationStatus.provisional =>
+        'Order notifications are enabled.',
+      AuthorizationStatus.denied =>
+        'Notifications are blocked. Enable them in iPhone Settings > Notifications > Maruthi Eats.',
+      _ =>
+        'Notifications are not available on this browser. Add Maruthi Eats to your Home Screen and try again.',
+    };
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
+  }
+
   void _showSignOutDialog(BuildContext context, AuthService authService) {
     showDialog(
       context: context,
@@ -158,13 +220,16 @@ class AccountScreen extends StatelessWidget {
         title: const Text('Sign Out'),
         content: const Text('Are you sure you want to sign out?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           TextButton(
             onPressed: () {
               Navigator.pop(ctx);
               authService.signOut();
             },
-            child: const Text('Sign Out', style: TextStyle(color: AppColors.maroon, fontWeight: FontWeight.bold)),
+            child: const Text('Sign Out',
+                style: TextStyle(
+                    color: AppColors.maroon, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -175,12 +240,14 @@ class AccountScreen extends StatelessWidget {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete Account', style: TextStyle(color: AppColors.error)),
+        title: const Text('Delete Account',
+            style: TextStyle(color: AppColors.error)),
         content: const Text(
           'This action is permanent and cannot be undone. All your personal data, saved addresses, and order history will be deleted.',
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(ctx);
@@ -200,14 +267,17 @@ class AccountScreen extends StatelessWidget {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('Could not delete account. Please try again.'),
+                      content:
+                          Text('Could not delete account. Please try again.'),
                       backgroundColor: AppColors.error,
                     ),
                   );
                 }
               }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.error,
+                foregroundColor: Colors.white),
             child: const Text('Delete Permanently'),
           ),
         ],
@@ -221,7 +291,8 @@ class _AccountMenuItem extends StatelessWidget {
   final String label;
   final VoidCallback onTap;
 
-  const _AccountMenuItem({required this.icon, required this.label, required this.onTap});
+  const _AccountMenuItem(
+      {required this.icon, required this.label, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -234,8 +305,10 @@ class _AccountMenuItem extends StatelessWidget {
         ),
         child: Icon(icon, color: AppColors.maroon, size: 24.r),
       ),
-      title: Text(label, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14.sp)),
-      trailing: Icon(Icons.chevron_right, color: AppColors.grey.withValues(alpha: 0.4), size: 20.r),
+      title: Text(label,
+          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14.sp)),
+      trailing: Icon(Icons.chevron_right,
+          color: AppColors.grey.withValues(alpha: 0.4), size: 20.r),
       onTap: onTap,
       contentPadding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 4.h),
     );
