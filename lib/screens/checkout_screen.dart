@@ -79,10 +79,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final at = _lastPreviewAt;
     final preview = _lastPreview;
     if (preview == null || at == null) return null;
-    if (_lastPreviewAddressId != address.id || _lastPreviewSubtotal != subtotal)
+    if (_lastPreviewAddressId != address.id || _lastPreviewSubtotal != subtotal) {
       return null;
-    if (_lastPreviewCoupon != context.read<CartProvider>().appliedCoupon?.code)
+    }
+    if (_lastPreviewCoupon != context.read<CartProvider>().appliedCoupon?.code) {
       return null;
+    }
     if (DateTime.now().difference(at) > const Duration(minutes: 2)) return null;
     return preview;
   }

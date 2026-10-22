@@ -21,6 +21,16 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 }
 
+// Use a registered App Check debug token only for a dedicated test build.
+// Production/release builds use Play Integrity on Android and DeviceCheck on
+// Apple platforms.
+const bool _useDebugAppCheck =
+    bool.fromEnvironment('USE_DEBUG_APP_CHECK', defaultValue: false);
+const String _webRecaptchaSiteKey = String.fromEnvironment(
+  'APP_CHECK_WEB_RECAPTCHA_SITE_KEY',
+  defaultValue: '6LdDD20tAAAAAOzELBUSgYE3PKsBdzKprh8gJ5rv',
+);
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -29,9 +39,13 @@ void main() async {
   );
 
   await FirebaseAppCheck.instance.activate(
-    androidProvider:
-        kDebugMode ? AndroidProvider.debug : AndroidProvider.playIntegrity,
-    appleProvider: AppleProvider.deviceCheck,
+    providerWeb: ReCaptchaV3Provider(_webRecaptchaSiteKey),
+    providerAndroid: (kDebugMode || _useDebugAppCheck)
+        ? const AndroidDebugProvider()
+        : const AndroidPlayIntegrityProvider(),
+    providerApple: (kDebugMode || _useDebugAppCheck)
+        ? const AppleDebugProvider()
+        : const AppleDeviceCheckProvider(), // Or const AppleAppAttestWithDeviceCheckFallbackProvider()
   );
 
   if (!kIsWeb) {

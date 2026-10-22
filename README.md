@@ -102,6 +102,8 @@ variables → Actions:
   Web configuration → Web Push certificates → Key pair (public key).
 * `MAPS_API_KEY`: the restricted Google Maps browser key for the production
   site.
+* `APP_CHECK_WEB_RECAPTCHA_SITE_KEY`: the reCAPTCHA v3 site key registered for
+  the customer production domain in Firebase App Check.
 * `FIREBASE_SERVICE_ACCOUNT_MARUTHI_EATS`: a Firebase service-account JSON
   value with permission to deploy Hosting for the `maruthi-eats` project.
 

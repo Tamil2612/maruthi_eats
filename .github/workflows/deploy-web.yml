@@ -31,20 +31,24 @@ jobs:
         env:
           FCM_VAPID_KEY: ${{ secrets.FCM_VAPID_KEY }}
           MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
+          APP_CHECK_WEB_RECAPTCHA_SITE_KEY: ${{ secrets.APP_CHECK_WEB_RECAPTCHA_SITE_KEY }}
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_MARUTHI_EATS }}
         run: |
           test -n "$FCM_VAPID_KEY" || { echo "Missing GitHub secret: FCM_VAPID_KEY"; exit 1; }
           test -n "$MAPS_API_KEY" || { echo "Missing GitHub secret: MAPS_API_KEY"; exit 1; }
+          test -n "$APP_CHECK_WEB_RECAPTCHA_SITE_KEY" || { echo "Missing GitHub secret: APP_CHECK_WEB_RECAPTCHA_SITE_KEY"; exit 1; }
           test -n "$FIREBASE_SERVICE_ACCOUNT" || { echo "Missing GitHub secret: FIREBASE_SERVICE_ACCOUNT_MARUTHI_EATS"; exit 1; }
 
       - name: Build web PWA
         env:
           FCM_VAPID_KEY: ${{ secrets.FCM_VAPID_KEY }}
           MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
+          APP_CHECK_WEB_RECAPTCHA_SITE_KEY: ${{ secrets.APP_CHECK_WEB_RECAPTCHA_SITE_KEY }}
         run: |
           flutter build web --release \
             --dart-define=FCM_VAPID_KEY="$FCM_VAPID_KEY" \
-            --dart-define=MAPS_API_KEY="$MAPS_API_KEY"
+            --dart-define=MAPS_API_KEY="$MAPS_API_KEY" \
+            --dart-define=APP_CHECK_WEB_RECAPTCHA_SITE_KEY="$APP_CHECK_WEB_RECAPTCHA_SITE_KEY"
 
       - name: Verify PWA messaging worker
         run: test -f build/web/firebase-messaging-sw.js
